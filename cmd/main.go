@@ -13,9 +13,10 @@ import (
 
 type Server struct {
 	rooms map[*chat.Room][]*chat.User
+	users []*chat.User
 }
 
-var server = Server{rooms: make(map[*chat.Room][]*chat.User)}
+var server = Server{rooms: make(map[*chat.Room][]*chat.User), users: []*chat.User{}}
 
 var wg sync.WaitGroup
 
@@ -32,11 +33,11 @@ func check_username(users map[net.Conn]string) bool {
 }
 
 // possibly will be used later
-func parse_command(command string, user chat.User) bool{
+func parse_command(command string, user chat.User) bool {
 	if strings.Contains(command, "/create") {
 		room_name := strings.Split(command, " ")[1]
 		flag := false
-		for i, _ := range server.rooms {
+		for i := range server.rooms {
 			if i.Room_name == room_name {
 				flag = true
 			}
@@ -44,28 +45,35 @@ func parse_command(command string, user chat.User) bool{
 		if !flag {
 			wg.Add(1)
 			go Runner(room_name)
+		} else {
+			user.Connection.Write([]byte("Room with this name is already exists \n"))
 		}
 	} else if strings.Contains(command, "/chats") {
-		for i, _ := range server.rooms {
-			user.Connection.Write([]byte(i.Room_name))
+		for i := range server.rooms {
+			if i.Room_name != "Lobby" {
+				user.Connection.Write([]byte(i.Room_name))
+			}
 		}
 	} else if strings.Contains(command, "/connect") {
 		room_name := strings.Split(command, " ")[1]
+		if room_name == "Lobby" {
+			return false
+		}
 		var room *chat.Room
 		flag := false
-		for i, _ := range server.rooms {
+		for i := range server.rooms {
 			if i.Room_name == room_name {
 				flag = true
 				room = i
 			}
 		}
-		if !flag{
+		if !flag {
 			user.Connection.Write([]byte("There is no such room"))
 		} else {
 			server.rooms[room] = append(server.rooms[room], &user)
-			room.Connections <- user.Connection
-			for i, _ := range server.rooms {
-				if i.Room_name == "Lobby"{
+			room.Connections <- user
+			for i := range server.rooms {
+				if i.Room_name == "Lobby" {
 					i.Dead_connections <- user.Connection
 				}
 			}
@@ -73,8 +81,8 @@ func parse_command(command string, user chat.User) bool{
 		}
 		return true
 	} else if strings.Contains(command, "/leave") {
-
-	} else if strings.Contains(command, "/help"){
+		
+	} else if strings.Contains(command, "/help") {
 		user.Connection.Write([]byte("Available commands are: \n" + "/chats \n" + "/create \n" + "/connect \n"))
 	}
 
@@ -100,7 +108,7 @@ func Start_Lobby(address string) {
 	lobby := chat.Room{}
 	lobby.Room_name = "Lobby"
 	lobby.Alive = make(map[net.Conn]string)
-	lobby.Connections = make(chan net.Conn)
+	lobby.Connections = make(chan chat.User)
 	lobby.Dead_connections = make(chan net.Conn)
 	lobby.Messages = make(chan string)
 	server.rooms[&lobby] = []*chat.User{}
@@ -112,25 +120,24 @@ func Start_Lobby(address string) {
 			if err != nil {
 				log.Println()
 			}
-			lobby.Connections <- conn
+			lobby.Connections <- chat.User{Connection: conn}
 		}
 	}()
 
 	for {
 		select {
-		case conn := <-lobby.Connections:
-			conn.Write([]byte("Enter your username:"))
-			r := bufio.NewScanner(conn)
-			username := ""
-			for r.Scan() {
-				username = r.Text()
-				break
-			}
-			user := chat.User{Username: username, Connection: conn}
-			server.rooms[&lobby] = append(server.rooms[&lobby], &user)
-			lobby.Alive[conn] = username
+		case user := <-lobby.Connections:
 			//listening for user's messages
-			go func(user chat.User, username string) {
+			go func() {
+				user.Connection.Write([]byte("Enter your username:"))
+				r := bufio.NewReader(user.Connection)
+				username, err := r.ReadString('\n')
+				if err != nil {
+					fmt.Println(err)
+				}
+				user.Username = strings.TrimSpace(username)
+				server.rooms[&lobby] = append(server.rooms[&lobby], &user)
+				lobby.Alive[user.Connection] = username
 				rd := bufio.NewReader(user.Connection)
 				for {
 					m, err := rd.ReadString('\n')
@@ -138,17 +145,16 @@ func Start_Lobby(address string) {
 						break
 					}
 					if m[0] == '/' {
-						if parse_command(m, user){
+						if parse_command(m, user) {
 							break
 						}
 					} else {
 						user.Connection.Write([]byte("No such command, available commands: /help \n"))
 					}
 				}
-				lobby.Dead_connections <- conn
-			}(user, username)
+				lobby.Dead_connections <- user.Connection
+			}()
 		case dconn := <-lobby.Dead_connections:
-			log.Printf("%v has disconnected from lobby\n", lobby.Alive[dconn])
 			delete(lobby.Alive, dconn)
 		}
 	}
@@ -157,37 +163,42 @@ func Start_Lobby(address string) {
 // Creates a room
 func Runner(room_name string) {
 	defer wg.Done()
-	fmt.Print("Server is running on:")
+	fmt.Printf("%s is running", room_name)
 	room := chat.Room{}
 	room.Room_name = room_name
 	room.Alive = make(map[net.Conn]string)
-	room.Connections = make(chan net.Conn)
+	room.Connections = make(chan chat.User)
 	room.Dead_connections = make(chan net.Conn)
 	room.Messages = make(chan string)
 	server.rooms[&room] = []*chat.User{}
 
 	for {
 		select {
-		case conn := <-room.Connections:
-			conn.Write([]byte("Enter your username:"))
-			r := bufio.NewScanner(conn)
-			username := ""
-			for r.Scan() {
-				username = r.Text()
-				break
+		case user := <-room.Connections:
+			for conn := range room.Alive {
+				conn.Write([]byte(fmt.Sprintf("%s have connected\n", user.Username)))
 			}
-			room.Alive[conn] = username
-			go func(conn net.Conn, username string) {
-				rd := bufio.NewReader(conn)
+			go func() {
+				room.Alive[user.Connection] = user.Username
+				rd := bufio.NewReader(user.Connection)
 				for {
 					m, err := rd.ReadString('\n')
 					if err != nil {
 						break
 					}
-					room.Messages <- fmt.Sprintf("%s: %v", username, m)
+					if strings.Contains(m, "/leave"){
+						break
+					} else {
+						room.Messages <- fmt.Sprintf("%s: %s", user.Username, m)
+					}	
 				}
-				room.Dead_connections <- conn
-			}(conn, username)
+				room.Dead_connections <- user.Connection
+				for i := range server.rooms {
+					if i.Room_name == "Lobby"{
+						i.Connections <- user
+					}
+				}
+			}()
 		case msg := <-room.Messages:
 			for conn := range room.Alive {
 				conn.Write([]byte(msg))
