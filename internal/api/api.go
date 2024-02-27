@@ -2,7 +2,6 @@ package api
 
 import(
 	"net/http"
-	"io"
 	"sync"
 	"github.com/gin-gonic/gin"
 	"fmt"
@@ -30,11 +29,7 @@ func Start_api(wg *sync.WaitGroup) {
 	})
 
 	router.POST("/create_chat", func(c *gin.Context) {
-		jsonData, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			// Handle error
-		}
-		fmt.Println(jsonData)
+
 	})
 
 	router.GET("/chats", func(c *gin.Context) {

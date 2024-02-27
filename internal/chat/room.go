@@ -5,11 +5,11 @@ import (
 )
 
 type Room struct {
-	room_name        string
-	room_id          int
-	creator          User
-	connections      chan net.Conn
-	messages         chan string
-	dead_connections chan net.Conn
-	alive            map[net.Conn]string
+	Room_name        string
+	Room_id          int
+	Creator          User
+	Connections      chan net.Conn
+	Messages         chan string
+	Dead_connections chan net.Conn
+	Alive            map[net.Conn]string
 }

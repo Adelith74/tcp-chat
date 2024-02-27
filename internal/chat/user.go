@@ -3,6 +3,6 @@ package chat
 import "net"
 
 type User struct {
-	username   string
-	connection net.Conn
+	Username   string
+	Connection net.Conn
 }
