@@ -4,19 +4,22 @@ import(
 	"net/http"
 	"sync"
 	"github.com/gin-gonic/gin"
-	"fmt"
+	"go_chat/internal/chat"
 )
 
-func Start_api(wg *sync.WaitGroup) {
+func Start_api(wg *sync.WaitGroup, server *chat.Server) {
 	defer wg.Done()
 	router := gin.Default()
 
 	//syntax emaple:
-	//http://localhost:8080/disconnect/?chat_id=1&username=lol
+	//http://localhost:8080/disconnect/?username=lol
 	router.DELETE("/disconnect", func(c *gin.Context) {
-		fmt.Println(c.Query("chat_id"))
-		fmt.Println(c.Query("username"))
-		c.JSON(http.StatusAccepted, gin.H{"message": "Deleted"})
+		err := server.KickUser(c.Query("username"))
+		if err != nil {
+			c.JSON(http.StatusAccepted, gin.H{"message": "User not found"})
+		} else {
+			c.JSON(http.StatusAccepted, gin.H{"message": "Disconnected"})
+		}
 	})
 
 	router.DELETE("/delete_chat", func(c *gin.Context) {
@@ -33,7 +36,7 @@ func Start_api(wg *sync.WaitGroup) {
 	})
 
 	router.GET("/chats", func(c *gin.Context) {
-
+		
 	})
 
 	router.Run(":8080")
