@@ -14,11 +14,12 @@ type Room struct {
 	Alive            map[net.Conn]string
 }
 
-func NewRoom(name string) *Room{
-	return &Room{
-		Alive: make(map[net.Conn]string),
-		Connections: make(chan User),
+func NewRoom(name string) Room {
+	return Room{
+		Room_name:        name,
+		Alive:            make(map[net.Conn]string),
+		Connections:      make(chan User),
 		Dead_connections: make(chan net.Conn),
-		Messages: make(chan string),
+		Messages:         make(chan string),
 	}
 }

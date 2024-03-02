@@ -18,10 +18,16 @@ var wg sync.WaitGroup
 func main() {
 	wg.Add(3)
 	go Start_Lobby(":8000")
-	go api.Start_api(&wg, server)
+	go api.Start_api(&wg, &server)
 	wg.Wait()
 }
 
+// if this name is already taken user cant connect
+func check_username(users map[net.Conn]string) bool {
+	return false
+}
+
+// possibly will be used later
 func parse_command(command string, user chat.User) bool {
 	if strings.Contains(command, "/create") {
 		room_name := strings.Split(command, " ")[1]
@@ -69,6 +75,8 @@ func parse_command(command string, user chat.User) bool {
 			user.Connection.Write([]byte(fmt.Sprintf("You are connected to %s", room.Room_name)))
 		}
 		return true
+	} else if strings.Contains(command, "/leave") {
+
 	} else if strings.Contains(command, "/help") {
 		user.Connection.Write([]byte("Available commands are: \n" + "/chats \n" + "/create \n" + "/connect \n"))
 	}
@@ -76,6 +84,10 @@ func parse_command(command string, user chat.User) bool {
 	return false
 }
 
+type Body struct {
+	chat_id  int    `json:"chat_id"`
+	username string `json:"username"`
+}
 
 // lobby for all users, who just connetcted to chat
 func Start_Lobby(address string) {
@@ -88,9 +100,13 @@ func Start_Lobby(address string) {
 	}
 
 	//creating lobby
-	lobby := chat.NewRoom("Lobby")
-	server.AddRoom(lobby)
-	
+	lobby := chat.Room{}
+	lobby.Room_name = "Lobby"
+	lobby.Alive = make(map[net.Conn]string)
+	lobby.Connections = make(chan chat.User)
+	lobby.Dead_connections = make(chan net.Conn)
+	lobby.Messages = make(chan string)
+	server.Rooms[&lobby] = []*chat.User{}
 
 	//listening for new connections
 	go func() {
@@ -108,18 +124,17 @@ func Start_Lobby(address string) {
 		case user := <-lobby.Connections:
 			//listening for user's messages
 			go func() {
-				if user.Username == ""{
-					user.Connection.Write([]byte("Enter your username:"))
-					r := bufio.NewReader(user.Connection)
-					username, err := r.ReadString('\n')
-					if err != nil {
-						fmt.Println(err)
-					}
-					user.Username = strings.TrimSpace(username)
-				}
-				server.Rooms[lobby] = append(server.Rooms[lobby], &user)
-				lobby.Alive[user.Connection] = user.Username
+				user.Connection.Write([]byte("Enter your username:"))
+				var username string
 				rd := bufio.NewReader(user.Connection)
+				username, err = rd.ReadString('\n')
+				if err != nil {
+					fmt.Println(err)
+				}
+				username = strings.TrimSpace(username)
+				user.Username = username
+				server.Rooms[&lobby] = append(server.Rooms[&lobby], &user)
+				lobby.Alive[user.Connection] = username
 				for {
 					m, err := rd.ReadString('\n')
 					if err != nil {
@@ -146,7 +161,7 @@ func Runner(room_name string) {
 	defer wg.Done()
 	fmt.Printf("%s is running", room_name)
 	room := chat.NewRoom(room_name)
-	server.AddRoom(room)
+	server.Rooms[&room] = []*chat.User{}
 
 	for {
 		select {
@@ -162,15 +177,15 @@ func Runner(room_name string) {
 					if err != nil {
 						break
 					}
-					if strings.Contains(m, "/leave"){
+					if strings.Contains(m, "/leave") {
 						break
 					} else {
 						room.Messages <- fmt.Sprintf("%s: %s", user.Username, m)
-					}	
+					}
 				}
 				room.Dead_connections <- user.Connection
 				for i := range server.Rooms {
-					if i.Room_name == "Lobby"{
+					if i.Room_name == "Lobby" {
 						i.Connections <- user
 					}
 				}
