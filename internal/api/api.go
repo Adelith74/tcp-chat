@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Start_api(wg *sync.WaitGroup, server *chat.Server) {
-	defer wg.Done()
+func Start_api(server *chat.Server) {
+	defer server.Wg.Done()
 	router := gin.Default()
 
 	//syntax emaple:
@@ -54,7 +54,7 @@ func Start_api(wg *sync.WaitGroup, server *chat.Server) {
 		rw := sync.RWMutex{}
 		rw.Lock()
 		if server.CheckChatName(chat_name) {
-			go server.NewChat(chat_name, wg)
+			go server.NewChat(chat_name)
 			c.JSON(http.StatusCreated, gin.H{"message": "Created"})
 		} else {
 			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "Can't create chat with this name"})

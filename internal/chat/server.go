@@ -14,6 +14,7 @@ type Server struct {
 	Lobby *Chat
 	Chats map[*Chat][]*User
 	Users []*User
+	Wg    sync.WaitGroup
 }
 
 // if this name is available returns true
@@ -67,6 +68,7 @@ func NewServer() Server {
 	return Server{
 		Chats: make(map[*Chat][]*User),
 		Users: []*User{},
+		Wg:    sync.WaitGroup{},
 	}
 }
 
@@ -82,8 +84,8 @@ func (server *Server) CheckChatName(chat_name string) bool {
 }
 
 // creates a new chat
-func (server *Server) NewChat(chat_name string, wg *sync.WaitGroup) error {
-	defer wg.Done()
+func (server *Server) NewChat(chat_name string) error {
+	defer server.Wg.Done()
 	rw := sync.RWMutex{}
 	rw.Lock()
 	if !server.CheckChatName(chat_name) {
@@ -137,8 +139,8 @@ func (server *Server) NewChat(chat_name string, wg *sync.WaitGroup) error {
 }
 
 // lobby for all users, who just connetcted to chat
-func (server Server) Start_Lobby(address string, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (server *Server) Start_Lobby(address string) {
+	defer server.Wg.Done()
 
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
@@ -151,7 +153,7 @@ func (server Server) Start_Lobby(address string, wg *sync.WaitGroup) {
 	server.Chats[&lobby] = []*User{}
 
 	//listening for new connections
-	wg.Add(1)
+	server.Wg.Add(1)
 	go func() {
 		for lobby.IsOpen {
 			conn, err := ln.Accept()
@@ -192,7 +194,7 @@ func (server Server) Start_Lobby(address string, wg *sync.WaitGroup) {
 						break
 					}
 					if m[0] == '/' {
-						if server.parse_command(m, user, wg) {
+						if server.parse_command(m, user) {
 							break
 						}
 					} else {
@@ -207,7 +209,7 @@ func (server Server) Start_Lobby(address string, wg *sync.WaitGroup) {
 	}
 }
 
-func (server Server) parse_command(command string, user User, wg *sync.WaitGroup) bool {
+func (server *Server) parse_command(command string, user User) bool {
 	if strings.Contains(command, "/create") {
 		room_name := strings.Split(command, " ")[1]
 		flag := false
@@ -217,8 +219,8 @@ func (server Server) parse_command(command string, user User, wg *sync.WaitGroup
 			}
 		}
 		if !flag {
-			wg.Add(1)
-			server.NewChat(strings.TrimSpace(room_name), wg)
+			server.Wg.Add(1)
+			server.NewChat(strings.TrimSpace(room_name))
 		} else {
 			user.Write("Room with this name is already exists \n")
 		}
