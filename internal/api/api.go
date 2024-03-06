@@ -22,24 +22,53 @@ func Start_api(wg *sync.WaitGroup, server *chat.Server) {
 		} else {
 			c.JSON(http.StatusAccepted, gin.H{"message": "Disconnected"})
 		}
+	})
+
+	router.POST("/auth", func(c *gin.Context) {
 
 	})
 
+	//syntax emaple:
+	//http://localhost:8080/delete_chat/?chat_name=hello
 	router.DELETE("/delete_chat", func(c *gin.Context) {
+		c.JSON(http.StatusAccepted, gin.H{"message": "Deleted"})
+	})
 
-		c.JSON(http.StatusAccepted, gin.H{"message": "created"})
+	router.POST("/close_chat", func(c *gin.Context) {
+		chat_name := c.Query("chatname")
+		err := server.CloseChat(chat_name)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
+		} else {
+			c.JSON(http.StatusAccepted, gin.H{"message": "Closed"})
+		}
 	})
 
 	router.GET("/logs", func(c *gin.Context) {
 
 	})
 
+	//creates a new chat with provided name
 	router.POST("/create_chat", func(c *gin.Context) {
-
+		chat_name := c.Query("chatname")
+		rw := sync.RWMutex{}
+		rw.Lock()
+		if server.CheckChatName(chat_name) {
+			go server.NewChat(chat_name, wg)
+			c.JSON(http.StatusCreated, gin.H{"message": "Created"})
+		} else {
+			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "Can't create chat with this name"})
+		}
 	})
 
 	router.GET("/chats", func(c *gin.Context) {
-
+		chats := []string{}
+		for chat := range server.Chats {
+			if chat.Chat_name != "Lobby" {
+				chats = append(chats, chat.Chat_name)
+			}
+		}
+		c.JSON(http.StatusAccepted, gin.H{"chats": chats})
 	})
 
 	router.Run(":8080")
