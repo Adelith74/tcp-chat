@@ -34,6 +34,14 @@ func Start_api(server *chat.Server) {
 		c.JSON(http.StatusAccepted, gin.H{"message": "Deleted"})
 	})
 
+	router.POST("/broadcast", func(c *gin.Context) {
+		msg := c.Query("message")
+		for _, u := range server.Users {
+			u.Write(msg + "\n")
+		}
+		c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
+	})
+
 	router.POST("/close_chat", func(c *gin.Context) {
 		chat_name := c.Query("chatname")
 		err := server.CloseChat(chat_name)
@@ -59,6 +67,7 @@ func Start_api(server *chat.Server) {
 		} else {
 			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "Can't create chat with this name"})
 		}
+		rw.Unlock()
 	})
 
 	router.GET("/chats", func(c *gin.Context) {

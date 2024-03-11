@@ -51,14 +51,14 @@ func (s *Server) CloseChat(chatname string) (err error) {
 		return errors.New("can't close lobby")
 	}
 	for c := range s.Chats {
-		fmt.Println(chatname)
 		if c.Chat_name == chatname {
-			fmt.Println("Chat with this name is found")
 			for _, u := range s.Chats[c] {
-				u.Connection.Write([]byte("This Chat was closed by admin"))
-				c.IsOpen = false
-				return
+				u.Write("This Chat was closed by admin\n")
+				s.Lobby.Connections <- u
 			}
+			c.IsOpen = false
+			delete(s.Chats, c)
+			return
 		}
 	}
 	return errors.New("there is no such chat")
@@ -87,16 +87,16 @@ func (server *Server) CheckChatName(chat_name string) bool {
 func (server *Server) NewChat(chat_name string) error {
 	defer server.Wg.Done()
 	chat := NewChat(chat_name)
-	server.Chats[&chat] = []*User{}
+	server.Chats[chat] = []*User{}
 	fmt.Printf("%s chat is running \n", chat_name)
 	for chat.IsOpen {
 		select {
 		case user := <-chat.Connections:
-			for conn := range chat.Alive {
-				conn.Write([]byte(fmt.Sprintf("%s have connected\n", user.Username)))
+			for u := range chat.Alive {
+				u.Write(fmt.Sprintf("%s have connected\n", user.Username))
 			}
 			go func() {
-				chat.Alive[user.Connection] = user.Username
+				chat.Alive[user] = user.Username
 				rd := bufio.NewReader(user.Connection)
 				for chat.IsOpen {
 					m, err := rd.ReadString('\n')
@@ -109,7 +109,7 @@ func (server *Server) NewChat(chat_name string) error {
 						chat.Messages <- fmt.Sprintf("%s: %s", user.Username, m)
 					}
 				}
-				chat.Dead_connections <- user.Connection
+				chat.Dead_connections <- user
 				for i := range server.Chats {
 					if i.Chat_name == "Lobby" {
 						i.Connections <- user
@@ -117,13 +117,13 @@ func (server *Server) NewChat(chat_name string) error {
 				}
 			}()
 		case msg := <-chat.Messages:
-			for conn := range chat.Alive {
-				conn.Write([]byte(msg))
+			for u := range chat.Alive {
+				u.Write(msg)
 			}
 		case dconn := <-chat.Dead_connections:
 			log.Printf("%v has disconnected\n", chat.Alive[dconn])
-			for conn := range chat.Alive {
-				conn.Write([]byte(fmt.Sprintf("%s has disconnected\n", chat.Alive[dconn])))
+			for u := range chat.Alive {
+				u.Write(fmt.Sprintf("%s has disconnected\n", chat.Alive[dconn]))
 			}
 			delete(chat.Alive, dconn)
 		}
@@ -143,7 +143,8 @@ func (server *Server) Start_Lobby(address string) {
 
 	//creating lobby
 	lobby := NewChat("Lobby")
-	server.Chats[&lobby] = []*User{}
+	server.Lobby = lobby
+	server.Chats[lobby] = []*User{}
 
 	//listening for new connections
 	server.Wg.Add(1)
@@ -181,9 +182,9 @@ func (server *Server) Start_Lobby(address string) {
 					user.Username = username
 					user.Write(fmt.Sprintf("Welcome to Lobby, %s \n", user.Username))
 				}
-				server.Chats[&lobby] = append(server.Chats[&lobby], user)
+				server.Chats[lobby] = append(server.Chats[lobby], user)
 				server.Users = append(server.Users, user)
-				lobby.Alive[user.Connection] = user.Username
+				lobby.Alive[user] = user.Username
 				for {
 					m, err := rd.ReadString('\n')
 					if err != nil {
@@ -197,7 +198,7 @@ func (server *Server) Start_Lobby(address string) {
 						user.Write("No such command, available commands: /help \n")
 					}
 				}
-				lobby.Dead_connections <- user.Connection
+				lobby.Dead_connections <- user
 			}()
 		case dconn := <-lobby.Dead_connections:
 			delete(lobby.Alive, dconn)
@@ -208,6 +209,7 @@ func (server *Server) Start_Lobby(address string) {
 func (server *Server) parse_command(command string, user *User) bool {
 	if strings.Contains(command, "/create") {
 		chat_name := strings.Split(command, " ")[1]
+		chat_name = strings.TrimSpace(chat_name)
 		flag := false
 		rw := sync.RWMutex{}
 		rw.Lock()
@@ -245,7 +247,7 @@ func (server *Server) parse_command(command string, user *User) bool {
 		} else {
 			server.Chats[room] = append(server.Chats[room], user)
 			room.Connections <- user
-			user.Write(fmt.Sprintf("You are connected to %s\n", room.Chat_name))
+			user.Write(fmt.Sprintf("You are connected to %s", room.Chat_name) + "\n")
 			return true
 		}
 	} else if strings.Contains(command, "/leave") {
