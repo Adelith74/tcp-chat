@@ -33,17 +33,13 @@ func (s *Server) KickUser(username string) (err error) {
 		for _, u := range r {
 			fmt.Println(u.Username)
 			if u.Username == username {
-				u.Connection.Write([]byte("You was kicked from this server"))
+				u.Write("You was kicked from this server")
 				u.Connection.Close()
 				return
 			}
 		}
 	}
 	return errors.New("user not found")
-}
-
-func (s *Server) MoveUserToLobby(user *User) {
-
 }
 
 func (s *Server) CloseChat(chatname string) (err error) {
@@ -54,6 +50,7 @@ func (s *Server) CloseChat(chatname string) (err error) {
 		if c.Chat_name == chatname {
 			for _, u := range s.Chats[c] {
 				u.Write("This Chat was closed by admin\n")
+				c.Dead_connections <- u
 				s.Lobby.Connections <- u
 			}
 			c.IsOpen = false
@@ -106,15 +103,11 @@ func (server *Server) NewChat(chat_name string) error {
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
-						chat.Messages <- fmt.Sprintf("%s: %s", user.Username, m)
+						chat.Messages <- fmt.Sprintf("%s: %s \n", user.Username, m)
 					}
 				}
 				chat.Dead_connections <- user
-				for i := range server.Chats {
-					if i.Chat_name == "Lobby" {
-						i.Connections <- user
-					}
-				}
+				server.Lobby.Connections <- user
 			}()
 		case msg := <-chat.Messages:
 			for u := range chat.Alive {
@@ -148,6 +141,7 @@ func (server *Server) Start_Lobby(address string) {
 
 	//listening for new connections
 	server.Wg.Add(1)
+	defer server.Wg.Done()
 	go func() {
 		for lobby.IsOpen {
 			conn, err := ln.Accept()
@@ -181,9 +175,9 @@ func (server *Server) Start_Lobby(address string) {
 					}
 					user.Username = username
 					user.Write(fmt.Sprintf("Welcome to Lobby, %s \n", user.Username))
+					server.Users = append(server.Users, user)
 				}
 				server.Chats[lobby] = append(server.Chats[lobby], user)
-				server.Users = append(server.Users, user)
 				lobby.Alive[user] = user.Username
 				for {
 					m, err := rd.ReadString('\n')
@@ -247,6 +241,7 @@ func (server *Server) parse_command(command string, user *User) bool {
 		} else {
 			server.Chats[room] = append(server.Chats[room], user)
 			room.Connections <- user
+			delete(server.Lobby.Alive, user)
 			user.Write(fmt.Sprintf("You are connected to %s", room.Chat_name) + "\n")
 			return true
 		}

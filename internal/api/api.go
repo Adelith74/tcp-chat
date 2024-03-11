@@ -11,14 +11,13 @@ import (
 func Start_api(server *chat.Server) {
 	defer server.Wg.Done()
 	router := gin.Default()
-
 	//syntax emaple:
 	//http://localhost:8080/disconnect/?chat_id=1&username=lol
 	router.POST("/disconnect", func(c *gin.Context) {
 		username := c.Query("username")
 		err := server.KickUser(username)
 		if err != nil {
-			c.JSON(http.StatusAccepted, gin.H{"message": "User not found"})
+			c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
 		} else {
 			c.JSON(http.StatusAccepted, gin.H{"message": "Disconnected"})
 		}
@@ -28,16 +27,10 @@ func Start_api(server *chat.Server) {
 
 	})
 
-	//syntax emaple:
-	//http://localhost:8080/delete_chat/?chat_name=hello
-	router.DELETE("/delete_chat", func(c *gin.Context) {
-		c.JSON(http.StatusAccepted, gin.H{"message": "Deleted"})
-	})
-
 	router.POST("/broadcast", func(c *gin.Context) {
 		msg := c.Query("message")
 		for _, u := range server.Users {
-			u.Write(msg + "\n")
+			u.Write("ADMIN:" + msg + "\n")
 		}
 		c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
 	})

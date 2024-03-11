@@ -11,6 +11,10 @@ type Chat struct {
 	IsOpen           bool
 }
 
+func (chat *Chat) LogMessage(message string, user User) {
+	//db.log(User.username, Date.Now(), message, chat.Chat_id)
+}
+
 func NewChat(name string) *Chat {
 	return &Chat{
 		Chat_name:        name,
