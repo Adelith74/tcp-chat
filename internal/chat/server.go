@@ -86,16 +86,9 @@ func (server *Server) CheckChatName(chat_name string) bool {
 // creates a new chat
 func (server *Server) NewChat(chat_name string) error {
 	defer server.Wg.Done()
-	rw := sync.RWMutex{}
-	rw.Lock()
-	if !server.CheckChatName(chat_name) {
-		return errors.New("chat with this name is already exists")
-	}
 	chat := NewChat(chat_name)
 	server.Chats[&chat] = []*User{}
 	fmt.Printf("%s chat is running \n", chat_name)
-	rw.Unlock()
-
 	for chat.IsOpen {
 		select {
 		case user := <-chat.Connections:
@@ -160,7 +153,7 @@ func (server *Server) Start_Lobby(address string) {
 			if err != nil {
 				log.Println()
 			}
-			lobby.Connections <- User{Connection: conn}
+			lobby.Connections <- &User{Connection: conn}
 		}
 	}()
 
@@ -169,25 +162,28 @@ func (server *Server) Start_Lobby(address string) {
 		case user := <-lobby.Connections:
 			//listening for user's messages
 			go func() {
-				var username string
 				rd := bufio.NewReader(user.Connection)
-				for {
-					user.Write("Enter your username: \n")
-					username, err = rd.ReadString('\n')
-					if err != nil {
-						fmt.Println(err)
+				if user.Username == "" {
+					var username string
+					for {
+						user.Write("Enter your username: \n")
+						username, err = rd.ReadString('\n')
+						if err != nil {
+							fmt.Println(err)
+						}
+						username = strings.TrimSpace(username)
+						if !server.Check_username(username) {
+							user.Write("This username is already taken\n")
+						} else {
+							break
+						}
 					}
-					username = strings.TrimSpace(username)
-					if !server.Check_username(username) {
-						user.Write("This username is already taken\n")
-					} else {
-						break
-					}
+					user.Username = username
+					user.Write(fmt.Sprintf("Welcome to Lobby, %s \n", user.Username))
 				}
-				user.Username = username
-				server.Chats[&lobby] = append(server.Chats[&lobby], &user)
-				server.Users = append(server.Users, &user)
-				lobby.Alive[user.Connection] = username
+				server.Chats[&lobby] = append(server.Chats[&lobby], user)
+				server.Users = append(server.Users, user)
+				lobby.Alive[user.Connection] = user.Username
 				for {
 					m, err := rd.ReadString('\n')
 					if err != nil {
@@ -209,21 +205,21 @@ func (server *Server) Start_Lobby(address string) {
 	}
 }
 
-func (server *Server) parse_command(command string, user User) bool {
+func (server *Server) parse_command(command string, user *User) bool {
 	if strings.Contains(command, "/create") {
-		room_name := strings.Split(command, " ")[1]
+		chat_name := strings.Split(command, " ")[1]
 		flag := false
-		for i := range server.Chats {
-			if i.Chat_name == room_name {
-				flag = true
-			}
-		}
-		if !flag {
+		rw := sync.RWMutex{}
+		rw.Lock()
+		flag = server.CheckChatName(chat_name)
+		if flag {
 			server.Wg.Add(1)
-			server.NewChat(strings.TrimSpace(room_name))
+			go server.NewChat(strings.TrimSpace(chat_name))
+			user.Write("Room was successfully created \n")
 		} else {
 			user.Write("Room with this name is already exists \n")
 		}
+		rw.Unlock()
 	} else if strings.Contains(command, "/chats") {
 		for i := range server.Chats {
 			if i.Chat_name != "Lobby" {
@@ -247,21 +243,18 @@ func (server *Server) parse_command(command string, user User) bool {
 			user.Write("There is no such room \n")
 			return false
 		} else {
-			server.Chats[room] = append(server.Chats[room], &user)
+			server.Chats[room] = append(server.Chats[room], user)
 			room.Connections <- user
-			for i := range server.Chats {
-				if i.Chat_name == "Lobby" {
-					i.Dead_connections <- user.Connection
-				}
-			}
 			user.Write(fmt.Sprintf("You are connected to %s\n", room.Chat_name))
+			return true
 		}
-		return true
 	} else if strings.Contains(command, "/leave") {
 
 	} else if strings.Contains(command, "/help") {
 		user.Write("Available commands are:\n" + "/chats\n" + "/create\n" + "/connect\n")
+	} else {
+		user.Write("No such command, available commands: /help \n")
+		user.Write("Available commands are:\n" + "/chats\n" + "/create\n" + "/connect\n")
 	}
-
 	return false
 }

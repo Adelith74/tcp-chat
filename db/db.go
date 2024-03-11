@@ -7,7 +7,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const connStr = "user=postgres password=mypass dbname=productdb sslmode=disable"
+type DB struct {
+}
+
+const connStr = "user=postgres password=root dbname=tcp-chat sslmode=disable"
+
+const create = "CREATE TABLE tcp (id integer, datetime timestamp without time zone, message TEXT, sender TEXT, chat TEXT)"
 
 func initDB() {
 	db, err := sql.Open("postgres", connStr)
