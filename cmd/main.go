@@ -8,6 +8,7 @@ import (
 var server = chat.NewServer()
 
 func main() {
+
 	server.Wg.Add(2)
 	go server.Start_Lobby(":8000")
 	go api.Start_api(&server)
