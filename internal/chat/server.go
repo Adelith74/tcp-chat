@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"go_chat/internal/repository"
 	"log"
 	"net"
 	"strings"
@@ -12,10 +11,11 @@ import (
 )
 
 type Server struct {
-	Lobby *Chat
-	Chats map[*Chat][]*User
-	Users []*User
-	Wg    sync.WaitGroup
+	Lobby     *Chat
+	Chats     map[*Chat][]*User
+	Users     []*User
+	Wg        sync.WaitGroup
+	Available int
 }
 
 // if this name is available returns true
@@ -30,16 +30,22 @@ func (s *Server) Check_username(username string) bool {
 }
 
 func (s *Server) KickUser(username string) (err error) {
+	rw := sync.RWMutex{}
+	rw.Lock()
 	for _, r := range s.Chats {
+		var users []*User
 		for _, u := range r {
-			fmt.Println(u.Username)
 			if u.Username == username {
 				u.Write("You was kicked from this server")
 				u.Connection.Close()
-				return
+			} else {
+				users = append(users, u)
 			}
 		}
+		s.Users = users
+		return
 	}
+	rw.Unlock()
 	return errors.New("user not found")
 }
 
@@ -64,9 +70,10 @@ func (s *Server) CloseChat(chatname string) (err error) {
 
 func NewServer() Server {
 	return Server{
-		Chats: make(map[*Chat][]*User),
-		Users: []*User{},
-		Wg:    sync.WaitGroup{},
+		Chats:     make(map[*Chat][]*User),
+		Users:     []*User{},
+		Wg:        sync.WaitGroup{},
+		Available: 1,
 	}
 }
 
@@ -84,7 +91,11 @@ func (server *Server) CheckChatName(chat_name string) bool {
 // creates a new chat
 func (server *Server) NewChat(chat_name string) error {
 	defer server.Wg.Done()
-	chat := NewChat(chat_name)
+	rw := sync.RWMutex{}
+	rw.Lock()
+	chat := NewChat(chat_name, server.Available)
+	server.Available += 1
+	rw.Unlock()
 	server.Chats[chat] = []*User{}
 	fmt.Printf("%s chat is running \n", chat_name)
 	for chat.IsOpen {
@@ -126,7 +137,7 @@ func (server *Server) NewChat(chat_name string) error {
 }
 
 // lobby for all users, who just connetcted to chat
-func (server *Server) Start_Lobby(address string, rManager repository.RepositoryManager) {
+func (server *Server) Start_Lobby(address string) {
 	defer server.Wg.Done()
 
 	ln, err := net.Listen("tcp", address)
@@ -136,7 +147,7 @@ func (server *Server) Start_Lobby(address string, rManager repository.Repository
 	}
 
 	//creating lobby
-	lobby := NewChat("Lobby")
+	lobby := NewChat("Lobby", 0)
 	server.Lobby = lobby
 	server.Chats[lobby] = []*User{}
 
@@ -152,7 +163,6 @@ func (server *Server) Start_Lobby(address string, rManager repository.Repository
 			lobby.Connections <- &User{Connection: conn}
 		}
 	}()
-
 	for lobby.IsOpen {
 		select {
 		case user := <-lobby.Connections:

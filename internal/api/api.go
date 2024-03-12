@@ -27,6 +27,7 @@ func Start_api(server *chat.Server) {
 
 	})
 
+	//broadcast messages to all users connected to the server
 	router.POST("/broadcast", func(c *gin.Context) {
 		msg := c.Query("message")
 		for _, u := range server.Users {
@@ -55,6 +56,7 @@ func Start_api(server *chat.Server) {
 		rw := sync.RWMutex{}
 		rw.Lock()
 		if server.CheckChatName(chat_name) {
+			server.Wg.Add(1)
 			go server.NewChat(chat_name)
 			c.JSON(http.StatusCreated, gin.H{"message": "Created"})
 		} else {
