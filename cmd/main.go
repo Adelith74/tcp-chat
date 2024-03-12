@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"go_chat/internal/api"
 	"go_chat/internal/chat"
 	"go_chat/internal/lib/db"
@@ -23,8 +24,11 @@ func main() {
 
 	manager := repository.NewRepositoryManager(database)
 
+	fmt.Println(manager)
+	fmt.Println(manager.MsgRepository)
+
 	server.Wg.Add(2)
-	go server.Start_Lobby(":8000", manager)
-	go api.Start_api(&server)
+	go server.Start_Lobby(ctx, ":8000", &manager)
+	go api.Start_api(ctx, &server, &manager)
 	server.Wg.Wait()
 }

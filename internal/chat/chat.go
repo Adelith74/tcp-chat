@@ -19,5 +19,6 @@ func NewChat(name string) *Chat {
 		Dead_connections: make(chan *User),
 		Messages:         make(chan string),
 		IsOpen:           true,
+		Creator:          &User{Username: "admin", Connection: nil},
 	}
 }

@@ -1,14 +1,17 @@
 package api
 
 import (
+	"context"
 	"go_chat/internal/chat"
 	"net/http"
 	"sync"
 
+	"go_chat/internal/repository"
+
 	"github.com/gin-gonic/gin"
 )
 
-func Start_api(server *chat.Server) {
+func Start_api(ctx context.Context, server *chat.Server, rManager *repository.RepositoryManager) {
 	defer server.Wg.Done()
 	router := gin.Default()
 
@@ -62,7 +65,7 @@ func Start_api(server *chat.Server) {
 		rw := sync.RWMutex{}
 		rw.Lock()
 		if server.CheckChatName(chat_name) {
-			go server.NewChat(chat_name)
+			go server.NewChat(ctx, chat_name, rManager)
 			c.JSON(http.StatusCreated, gin.H{"message": "Created"})
 		} else {
 			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "Can't create chat with this name"})

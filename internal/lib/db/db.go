@@ -16,13 +16,16 @@ type Db struct {
 
 func New(ctx context.Context) *Db {
 
-	connectionString := fmt.Sprintf(connection, "localhost", "5432", "user", "password", "postgres", "disable")
+	connectionString := fmt.Sprintf(connection, "localhost", "5432", "postgres", "0011924", "postgres", "disable")
 
 	conn, err := pgxpool.New(ctx, connectionString)
 
 	if err != nil {
+		fmt.Println(err)
 		log.Fatal(err)
 	}
+
+	fmt.Println("Создалось")
 
 	return &Db{PgConn: conn}
 }
