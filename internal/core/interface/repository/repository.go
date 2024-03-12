@@ -13,6 +13,7 @@ type AuthRepository interface {
 type ChatRepository interface {
 	CreateChat(ctx context.Context, chat model.Chat) (int, error)
 	GetChat(ctx context.Context, chatId int) (model.Chat, error)
+	DeleteChat(ctx context.Context, chatId int) error
 }
 
 type MsgRepository interface {

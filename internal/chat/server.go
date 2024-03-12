@@ -49,7 +49,7 @@ func (s *Server) MoveUserToLobby(user *User) {
 
 }
 
-func (s *Server) CloseChat(chatname string) (err error) {
+func (s *Server) CloseChat(ctx context.Context, chatname string, rManager *repository.RepositoryManager) (err error) {
 	if chatname == "Lobby" {
 		return errors.New("can't close lobby")
 	}
@@ -61,6 +61,7 @@ func (s *Server) CloseChat(chatname string) (err error) {
 			}
 			c.IsOpen = false
 			delete(s.Chats, c)
+			rManager.DeleteChat(ctx, c.Chat_id)
 			return
 		}
 	}

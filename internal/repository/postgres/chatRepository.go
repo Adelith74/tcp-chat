@@ -57,3 +57,17 @@ func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (
 
 	return model.Chat(chat), nil
 }
+
+func (postRepository _chatRepository) DeleteChat(ctx context.Context, chatId int) error {
+	var chat dbModel.Chat
+
+	err := postRepository.db.PgConn.QueryRow(ctx,
+		`DELETE FROM public.chat c WHERE c.id=$1`,
+		chatId).Scan(&chat.Chat_id)
+
+	if err != nil {
+		return fmt.Errorf("ошибка получения чата: %s", err.Error())
+	}
+
+	return nil
+}

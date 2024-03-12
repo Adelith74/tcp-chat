@@ -47,7 +47,7 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 
 	router.POST("/close_chat", func(c *gin.Context) {
 		chat_name := c.Query("chatname")
-		err := server.CloseChat(chat_name)
+		err := server.CloseChat(ctx, chat_name, rManager)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
 		} else {
