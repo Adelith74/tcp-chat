@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"go_chat/internal/repository"
 	"log"
 	"net"
 	"strings"
@@ -132,7 +133,7 @@ func (server *Server) NewChat(chat_name string) error {
 }
 
 // lobby for all users, who just connetcted to chat
-func (server *Server) Start_Lobby(address string) {
+func (server *Server) Start_Lobby(address string, rManager repository.RepositoryManager) {
 	defer server.Wg.Done()
 
 	ln, err := net.Listen("tcp", address)

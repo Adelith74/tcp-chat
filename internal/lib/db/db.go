@@ -16,7 +16,7 @@ type Db struct {
 
 func New(ctx context.Context) *Db {
 
-	connectionString := fmt.Sprintf(connection, "10.80.0.139", "5432", "user", "password", "postgres", "disable")
+	connectionString := fmt.Sprintf(connection, "localhost", "5432", "user", "password", "postgres", "disable")
 
 	conn, err := pgxpool.New(ctx, connectionString)
 

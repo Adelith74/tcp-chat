@@ -12,7 +12,7 @@ type RepositoryManager struct {
 	repository.MsgRepository
 }
 
-func NewRepositoryManager(db *db.Db, host string) RepositoryManager {
+func NewRepositoryManager(db *db.Db) RepositoryManager {
 	return RepositoryManager{
 		postgres.NewRepo(db),
 		postgres.NewChatRepo(db),
