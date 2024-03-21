@@ -14,14 +14,13 @@ import (
 func Start_api(ctx context.Context, server *chat.Server, rManager *repository.RepositoryManager) {
 	defer server.Wg.Done()
 	router := gin.Default()
-
 	//syntax emaple:
 	//http://localhost:8080/disconnect/?chat_id=1&username=lol
 	router.POST("/disconnect", func(c *gin.Context) {
 		username := c.Query("username")
 		err := server.KickUser(username)
 		if err != nil {
-			c.JSON(http.StatusAccepted, gin.H{"message": "User not found"})
+			c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
 		} else {
 			c.JSON(http.StatusAccepted, gin.H{"message": "Disconnected"})
 		}
@@ -31,16 +30,11 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 
 	})
 
-	//syntax emaple:
-	//http://localhost:8080/delete_chat/?chat_name=hello
-	router.DELETE("/delete_chat", func(c *gin.Context) {
-		c.JSON(http.StatusAccepted, gin.H{"message": "Deleted"})
-	})
-
+	//broadcast messages to all users connected to the server
 	router.POST("/broadcast", func(c *gin.Context) {
 		msg := c.Query("message")
 		for _, u := range server.Users {
-			u.Write(msg + "\n")
+			u.Write("ADMIN:" + msg + "\n")
 		}
 		c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
 	})
@@ -66,6 +60,7 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 		rw.Lock()
 		if server.CheckChatName(chat_name) {
 			go server.NewChat(ctx, chat_name, rManager)
+			server.Wg.Add(1)
 			c.JSON(http.StatusCreated, gin.H{"message": "Created"})
 		} else {
 			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "Can't create chat with this name"})

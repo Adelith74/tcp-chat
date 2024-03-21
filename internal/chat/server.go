@@ -14,10 +14,11 @@ import (
 )
 
 type Server struct {
-	Lobby *Chat
-	Chats map[*Chat][]*User
-	Users []*User
-	Wg    sync.WaitGroup
+	Lobby     *Chat
+	Chats     map[*Chat][]*User
+	Users     []*User
+	Wg        sync.WaitGroup
+	Available int
 }
 
 // if this name is available returns true
@@ -32,18 +33,25 @@ func (s *Server) Check_username(username string) bool {
 }
 
 func (s *Server) KickUser(username string) (err error) {
+	rw := sync.RWMutex{}
+	rw.Lock()
 	for _, r := range s.Chats {
+		var users []*User
 		for _, u := range r {
-			fmt.Println(u.Username)
 			if u.Username == username {
-				u.Connection.Write([]byte("You was kicked from this server"))
+				u.Write("You was kicked from this server")
 				u.Connection.Close()
-				return
+			} else {
+				users = append(users, u)
 			}
 		}
+		s.Users = users
+		return
 	}
+	rw.Unlock()
 	return errors.New("user not found")
 }
+
 
 func (s *Server) MoveUserToLobby(user *User) {
 
@@ -57,6 +65,7 @@ func (s *Server) CloseChat(ctx context.Context, chatname string, rManager *repos
 		if c.Chat_name == chatname {
 			for _, u := range s.Chats[c] {
 				u.Write("This Chat was closed by admin\n")
+				c.Dead_connections <- u
 				s.Lobby.Connections <- u
 			}
 			c.IsOpen = false
@@ -70,9 +79,10 @@ func (s *Server) CloseChat(ctx context.Context, chatname string, rManager *repos
 
 func NewServer() Server {
 	return Server{
-		Chats: make(map[*Chat][]*User),
-		Users: []*User{},
-		Wg:    sync.WaitGroup{},
+		Chats:     make(map[*Chat][]*User),
+		Users:     []*User{},
+		Wg:        sync.WaitGroup{},
+		Available: 1,
 	}
 }
 
@@ -90,8 +100,11 @@ func (server *Server) CheckChatName(chat_name string) bool {
 // creates a new chat
 func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *repository.RepositoryManager) error {
 	defer server.Wg.Done()
+  rw := sync.RWMutex{}
+	rw.Lock()
 	chat := NewChat(chat_name)
-
+  server.Available += 1
+	rw.Unlock()
 	fmt.Println(chat.Chat_name, chat.Chat_id, chat.Creator.Username, chat.IsOpen)
 
 	_, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen})
@@ -119,15 +132,11 @@ func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *r
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
-						chat.Messages <- fmt.Sprintf("%s: %s", user.Username, m)
+						chat.Messages <- fmt.Sprintf("%s: %s \n", user.Username, m)
 					}
 				}
 				chat.Dead_connections <- user
-				for i := range server.Chats {
-					if i.Chat_name == "Lobby" {
-						i.Connections <- user
-					}
-				}
+				server.Lobby.Connections <- user
 			}()
 		case msg := <-chat.Messages:
 			for u := range chat.Alive {
@@ -155,12 +164,13 @@ func (server *Server) Start_Lobby(ctx context.Context, address string, rManager 
 	}
 
 	//creating lobby
-	lobby := NewChat("Lobby")
+	lobby := NewChat("Lobby", 0)
 	server.Lobby = lobby
 	server.Chats[lobby] = []*User{}
 
 	//listening for new connections
 	server.Wg.Add(1)
+	defer server.Wg.Done()
 	go func() {
 		for lobby.IsOpen {
 			conn, err := ln.Accept()
@@ -170,7 +180,6 @@ func (server *Server) Start_Lobby(ctx context.Context, address string, rManager 
 			lobby.Connections <- &User{Connection: conn}
 		}
 	}()
-
 	for lobby.IsOpen {
 		select {
 		case user := <-lobby.Connections:
@@ -194,9 +203,9 @@ func (server *Server) Start_Lobby(ctx context.Context, address string, rManager 
 					}
 					user.Username = username
 					user.Write(fmt.Sprintf("Welcome to Lobby, %s \n", user.Username))
+					server.Users = append(server.Users, user)
 				}
 				server.Chats[lobby] = append(server.Chats[lobby], user)
-				server.Users = append(server.Users, user)
 				lobby.Alive[user] = user.Username
 				for {
 					m, err := rd.ReadString('\n')
@@ -260,6 +269,7 @@ func (server *Server) parse_command(ctx context.Context, command string, user *U
 		} else {
 			server.Chats[room] = append(server.Chats[room], user)
 			room.Connections <- user
+			delete(server.Lobby.Alive, user)
 			user.Write(fmt.Sprintf("You are connected to %s", room.Chat_name) + "\n")
 			return true
 		}
