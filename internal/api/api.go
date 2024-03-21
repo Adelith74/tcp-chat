@@ -1,14 +1,17 @@
 package api
 
 import (
+	"context"
 	"go_chat/internal/chat"
 	"net/http"
 	"sync"
 
+	"go_chat/internal/repository"
+
 	"github.com/gin-gonic/gin"
 )
 
-func Start_api(server *chat.Server) {
+func Start_api(ctx context.Context, server *chat.Server, rManager *repository.RepositoryManager) {
 	defer server.Wg.Done()
 	router := gin.Default()
 	//syntax emaple:
@@ -38,7 +41,7 @@ func Start_api(server *chat.Server) {
 
 	router.POST("/close_chat", func(c *gin.Context) {
 		chat_name := c.Query("chatname")
-		err := server.CloseChat(chat_name)
+		err := server.CloseChat(ctx, chat_name, rManager)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
 		} else {
@@ -56,8 +59,8 @@ func Start_api(server *chat.Server) {
 		rw := sync.RWMutex{}
 		rw.Lock()
 		if server.CheckChatName(chat_name) {
+			go server.NewChat(ctx, chat_name, rManager)
 			server.Wg.Add(1)
-			go server.NewChat(chat_name)
 			c.JSON(http.StatusCreated, gin.H{"message": "Created"})
 		} else {
 			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "Can't create chat with this name"})

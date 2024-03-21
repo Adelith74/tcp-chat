@@ -21,12 +21,25 @@ func (chatRepository _chatRepository) CreateChat(ctx context.Context, chat model
 	chatDb := dbModel.Chat(chat)
 	var id int
 
-	err := chatRepository.db.PgConn.QueryRow(ctx,
-		`INSERT INTO public.chat(chat_name, chat_id, creator, is_open) values ($1,$2,$3,$4) RETURNING id`,
+	var str_format = fmt.Sprintf("INSERT INTO public.chat(chat_name, chat_id, creator, is_open) values (%s,%s,%s,%s) RETURNING chat_id",
 		chatDb.Chat_name,
 		chatDb.Chat_id,
 		chatDb.Creator,
+		chatDb.IsOpen)
+
+	fmt.Println(str_format)
+
+	err := chatRepository.db.PgConn.QueryRow(ctx,
+		`INSERT INTO public.chat(chat_name, creator, is_open) values ($1,$2,$3) RETURNING chat_id`,
+		chatDb.Chat_name,
+		chatDb.Creator,
 		chatDb.IsOpen).Scan(&id)
+
+	chatRepository.db.PgConn.QueryRow(ctx, `COMMIT`)
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	return id, err
 }
@@ -43,4 +56,18 @@ func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (
 	}
 
 	return model.Chat(chat), nil
+}
+
+func (postRepository _chatRepository) DeleteChat(ctx context.Context, chatId int) error {
+	var chat dbModel.Chat
+
+	err := postRepository.db.PgConn.QueryRow(ctx,
+		`DELETE FROM public.chat c WHERE c.id=$1`,
+		chatId).Scan(&chat.Chat_id)
+
+	if err != nil {
+		return fmt.Errorf("ошибка получения чата: %s", err.Error())
+	}
+
+	return nil
 }

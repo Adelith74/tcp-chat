@@ -2,8 +2,11 @@ package chat
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
+	"go_chat/internal/model"
+	"go_chat/internal/repository"
 	"log"
 	"net"
 	"strings"
@@ -49,7 +52,12 @@ func (s *Server) KickUser(username string) (err error) {
 	return errors.New("user not found")
 }
 
-func (s *Server) CloseChat(chatname string) (err error) {
+
+func (s *Server) MoveUserToLobby(user *User) {
+
+}
+
+func (s *Server) CloseChat(ctx context.Context, chatname string, rManager *repository.RepositoryManager) (err error) {
 	if chatname == "Lobby" {
 		return errors.New("can't close lobby")
 	}
@@ -62,6 +70,7 @@ func (s *Server) CloseChat(chatname string) (err error) {
 			}
 			c.IsOpen = false
 			delete(s.Chats, c)
+			rManager.DeleteChat(ctx, c.Chat_id)
 			return
 		}
 	}
@@ -89,13 +98,21 @@ func (server *Server) CheckChatName(chat_name string) bool {
 }
 
 // creates a new chat
-func (server *Server) NewChat(chat_name string) error {
+func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *repository.RepositoryManager) error {
 	defer server.Wg.Done()
-	rw := sync.RWMutex{}
+  rw := sync.RWMutex{}
 	rw.Lock()
-	chat := NewChat(chat_name, server.Available)
-	server.Available += 1
+	chat := NewChat(chat_name)
+  server.Available += 1
 	rw.Unlock()
+	fmt.Println(chat.Chat_name, chat.Chat_id, chat.Creator.Username, chat.IsOpen)
+
+	_, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	server.Chats[chat] = []*User{}
 	fmt.Printf("%s chat is running \n", chat_name)
 	for chat.IsOpen {
@@ -137,7 +154,7 @@ func (server *Server) NewChat(chat_name string) error {
 }
 
 // lobby for all users, who just connetcted to chat
-func (server *Server) Start_Lobby(address string) {
+func (server *Server) Start_Lobby(ctx context.Context, address string, rManager *repository.RepositoryManager) {
 	defer server.Wg.Done()
 
 	ln, err := net.Listen("tcp", address)
@@ -196,7 +213,7 @@ func (server *Server) Start_Lobby(address string) {
 						break
 					}
 					if m[0] == '/' {
-						if server.parse_command(m, user) {
+						if server.parse_command(ctx, m, user, rManager) {
 							break
 						}
 					} else {
@@ -211,7 +228,7 @@ func (server *Server) Start_Lobby(address string) {
 	}
 }
 
-func (server *Server) parse_command(command string, user *User) bool {
+func (server *Server) parse_command(ctx context.Context, command string, user *User, rManager *repository.RepositoryManager) bool {
 	if strings.Contains(command, "/create") {
 		chat_name := strings.Split(command, " ")[1]
 		chat_name = strings.TrimSpace(chat_name)
@@ -221,7 +238,7 @@ func (server *Server) parse_command(command string, user *User) bool {
 		flag = server.CheckChatName(chat_name)
 		if flag {
 			server.Wg.Add(1)
-			go server.NewChat(strings.TrimSpace(chat_name))
+			go server.NewChat(ctx, strings.TrimSpace(chat_name), rManager)
 			user.Write("Room was successfully created \n")
 		} else {
 			user.Write("Room with this name is already exists \n")
