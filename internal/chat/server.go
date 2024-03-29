@@ -52,7 +52,6 @@ func (s *Server) KickUser(username string) (err error) {
 	return errors.New("user not found")
 }
 
-
 func (s *Server) MoveUserToLobby(user *User) {
 
 }
@@ -64,7 +63,7 @@ func (s *Server) CloseChat(ctx context.Context, chatname string, rManager *repos
 	for c := range s.Chats {
 		if c.Chat_name == chatname {
 			for _, u := range s.Chats[c] {
-				u.Write("This Chat was closed by admin\n")
+				u.Write("This Chat was closed by admin\n\r")
 				c.Dead_connections <- u
 				s.Lobby.Connections <- u
 			}
@@ -97,21 +96,21 @@ func (server *Server) CheckChatName(chat_name string) bool {
 	return flag
 }
 
-// creates a new chat
+// creates a new chat only when chatname is available (checked before calling this function)
 func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *repository.RepositoryManager) error {
 	defer server.Wg.Done()
-  rw := sync.RWMutex{}
+	rw := sync.RWMutex{}
 	rw.Lock()
 	chat := NewChat(chat_name)
-  server.Available += 1
-	rw.Unlock()
-	fmt.Println(chat.Chat_name, chat.Chat_id, chat.Creator.Username, chat.IsOpen)
-
-	_, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen})
+	available_id, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen})
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+	chat.Id = available_id
+	server.Available += 1
+	rw.Unlock()
+	fmt.Println(chat.Chat_name, chat.Chat_id, chat.Creator.Username, chat.IsOpen)
 
 	server.Chats[chat] = []*User{}
 	fmt.Printf("%s chat is running \n", chat_name)
@@ -119,7 +118,7 @@ func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *r
 		select {
 		case user := <-chat.Connections:
 			for u := range chat.Alive {
-				u.Write(fmt.Sprintf("%s have connected\n", user.Username))
+				u.Write(fmt.Sprintf("%s have connected\n\r", user.Username))
 			}
 			go func() {
 				chat.Alive[user] = user.Username
@@ -132,7 +131,7 @@ func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *r
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
-						chat.Messages <- fmt.Sprintf("%s: %s \n", user.Username, m)
+						chat.Messages <- fmt.Sprintf("%s: %s \n\r", user.Username, m)
 					}
 				}
 				chat.Dead_connections <- user
@@ -145,7 +144,7 @@ func (server *Server) NewChat(ctx context.Context, chat_name string, rManager *r
 		case dconn := <-chat.Dead_connections:
 			log.Printf("%v has disconnected\n", chat.Alive[dconn])
 			for u := range chat.Alive {
-				u.Write(fmt.Sprintf("%s has disconnected\n", chat.Alive[dconn]))
+				u.Write(fmt.Sprintf("%s has disconnected\n\r", chat.Alive[dconn]))
 			}
 			delete(chat.Alive, dconn)
 		}
@@ -164,7 +163,8 @@ func (server *Server) Start_Lobby(ctx context.Context, address string, rManager 
 	}
 
 	//creating lobby
-	lobby := NewChat("Lobby", 0)
+	lobby := NewChat("Lobby")
+	lobby.Id = 0
 	server.Lobby = lobby
 	server.Chats[lobby] = []*User{}
 
@@ -189,20 +189,20 @@ func (server *Server) Start_Lobby(ctx context.Context, address string, rManager 
 				if user.Username == "" {
 					var username string
 					for {
-						user.Write("Enter your username: \n")
+						user.Write("Enter your username: \n\r")
 						username, err = rd.ReadString('\n')
 						if err != nil {
 							fmt.Println(err)
 						}
 						username = strings.TrimSpace(username)
 						if !server.Check_username(username) {
-							user.Write("This username is already taken\n")
+							user.Write("This username is already taken\n\r")
 						} else {
 							break
 						}
 					}
 					user.Username = username
-					user.Write(fmt.Sprintf("Welcome to Lobby, %s \n", user.Username))
+					user.Write(fmt.Sprintf("Welcome to Lobby, %s \n\r", user.Username))
 					server.Users = append(server.Users, user)
 				}
 				server.Chats[lobby] = append(server.Chats[lobby], user)
@@ -217,7 +217,7 @@ func (server *Server) Start_Lobby(ctx context.Context, address string, rManager 
 							break
 						}
 					} else {
-						user.Write("No such command, available commands: /help \n")
+						user.Write("No such command, available commands: /help \n\r")
 					}
 				}
 				lobby.Dead_connections <- user
@@ -239,9 +239,9 @@ func (server *Server) parse_command(ctx context.Context, command string, user *U
 		if flag {
 			server.Wg.Add(1)
 			go server.NewChat(ctx, strings.TrimSpace(chat_name), rManager)
-			user.Write("Room was successfully created \n")
+			user.Write("Room was successfully created \n\r")
 		} else {
-			user.Write("Room with this name is already exists \n")
+			user.Write("Room with this name is already exists \n\r")
 		}
 		rw.Unlock()
 	} else if strings.Contains(command, "/chats") {
@@ -264,22 +264,22 @@ func (server *Server) parse_command(ctx context.Context, command string, user *U
 			}
 		}
 		if !flag {
-			user.Write("There is no such room \n")
+			user.Write("There is no such room \n\r")
 			return false
 		} else {
 			server.Chats[room] = append(server.Chats[room], user)
 			room.Connections <- user
 			delete(server.Lobby.Alive, user)
-			user.Write(fmt.Sprintf("You are connected to %s", room.Chat_name) + "\n")
+			user.Write(fmt.Sprintf("You are connected to %s", room.Chat_name) + "\n\r")
 			return true
 		}
 	} else if strings.Contains(command, "/leave") {
 
 	} else if strings.Contains(command, "/help") {
-		user.Write("Available commands are:\n" + "/chats\n" + "/create\n" + "/connect\n")
+		user.Write("Available commands are:\n\r" + "/chats\n\r" + "/create\n\r" + "/connect\n\r")
 	} else {
-		user.Write("No such command, available commands: /help \n")
-		user.Write("Available commands are:\n" + "/chats\n" + "/create\n" + "/connect\n")
+		user.Write("No such command, available commands: /help \n\r")
+		user.Write("Available commands are:\n\r" + "/chats\n\r" + "/create\n\r" + "/connect\n\r")
 	}
 	return false
 }

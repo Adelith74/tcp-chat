@@ -9,13 +9,14 @@ type Chat struct {
 	Dead_connections chan *User
 	Alive            map[*User]string
 	IsOpen           bool
+	Id               int
 }
 
 func (chat *Chat) LogMessage(message string, user User) {
 	//db.log(User.username, Date.Now(), message, chat.Chat_id)
 }
 
-func NewChat(name string, id int) *Chat {
+func NewChat(name string) *Chat {
 	return &Chat{
 		Chat_name:        name,
 		Alive:            make(map[*User]string),
@@ -24,6 +25,5 @@ func NewChat(name string, id int) *Chat {
 		Messages:         make(chan string),
 		IsOpen:           true,
 		Creator:          &User{Username: "admin", Connection: nil},
-		Chat_id:          id,
 	}
 }

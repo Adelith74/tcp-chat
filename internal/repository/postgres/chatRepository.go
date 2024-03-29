@@ -44,6 +44,19 @@ func (chatRepository _chatRepository) CreateChat(ctx context.Context, chat model
 	return id, err
 }
 
+// returns available Id
+func (postRepository _chatRepository) GetId(ctx context.Context) (int, error) {
+	id := 0
+	err := postRepository.db.PgConn.QueryRow(ctx,
+		`SELECT MAX(c.chat_id) FROM public.chat as c`).Scan(&id)
+
+	if err != nil {
+		return 0, fmt.Errorf("ошибка получения чата: %s", err.Error())
+	}
+
+	return id, nil
+}
+
 func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (model.Chat, error) {
 	var chat dbModel.Chat
 
