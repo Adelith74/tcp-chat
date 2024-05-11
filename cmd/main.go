@@ -25,7 +25,6 @@ func main() {
 
 	fmt.Println(manager)
 	fmt.Println(manager.MsgRepository)
-
 	server.Wg.Add(2)
 	go server.Start_Lobby(ctx, ":8000", &manager)
 	go api.Start_api(ctx, &server, &manager)

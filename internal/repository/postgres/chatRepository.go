@@ -62,12 +62,16 @@ func (chatRepository _chatRepository) GetChats(ctx context.Context) ([]model.Cha
 	if err != nil {
 		return []model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
 	}
+	defer rows.Close()
+	chat := dbModel.Chat{}
 	for rows.Next() {
-		chat := dbModel.Chat{}
-		rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen)
+		err := rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen)
+		if err != nil {
+			fmt.Println(err)
+		}
 		chats = append(chats, model.Chat(chat))
 	}
-	return make([]model.Chat, 0), nil
+	return chats, nil
 }
 
 func (chatRepository _chatRepository) GetChat(ctx context.Context, chatId int) (model.Chat, error) {

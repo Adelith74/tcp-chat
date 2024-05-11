@@ -57,8 +57,54 @@ func (s *Server) MoveUserToLobby(user *User) {
 
 }
 
-func (s *Server) RunChat(ctx context.Context, chat dbModel.Chat) {
-
+func (s *Server) RunChat(ctx context.Context, c dbModel.Chat) {
+	s.Wg.Add(1)
+	defer s.Wg.Done()
+	rw := sync.RWMutex{}
+	rw.Lock()
+	chat := &Chat{Chat_name: c.Chat_name, Chat_id: c.Chat_id, Creator: &User{Username: c.Creator, Connection: nil}, IsOpen: c.IsOpen}
+	chat.Connections = make(chan *User)
+	chat.Alive = make(map[*User]string)
+	chat.Dead_connections = make(chan *User)
+	chat.Messages = make(chan string)
+	s.Chats[chat] = []*User{}
+	fmt.Printf("%s was launched during app start \n", chat.Chat_name)
+	rw.Unlock()
+	for chat.IsOpen {
+		select {
+		case user := <-chat.Connections:
+			for u := range chat.Alive {
+				u.Write(fmt.Sprintf("%s has connected\n\r", user.Username))
+			}
+			go func() {
+				chat.Alive[user] = user.Username
+				rd := bufio.NewReader(user.Connection)
+				for chat.IsOpen {
+					m, err := rd.ReadString('\n')
+					if err != nil {
+						break
+					}
+					if strings.Contains(m, "/leave") {
+						break
+					} else {
+						chat.Messages <- fmt.Sprintf("%s: %s \n\r", user.Username, m)
+					}
+				}
+				chat.Dead_connections <- user
+				s.Lobby.Connections <- user
+			}()
+		case msg := <-chat.Messages:
+			for u := range chat.Alive {
+				u.Write(msg)
+			}
+		case dconn := <-chat.Dead_connections:
+			log.Printf("%v has disconnected\n", chat.Alive[dconn])
+			for u := range chat.Alive {
+				u.Write(fmt.Sprintf("%s has disconnected\n\r", chat.Alive[dconn]))
+			}
+			delete(chat.Alive, dconn)
+		}
+	}
 }
 
 func (s *Server) CloseChat(ctx context.Context, chatname string, rManager *repository.RepositoryManager) (err error) {
@@ -101,17 +147,15 @@ func (s *Server) CheckChatName(chat_name string) bool {
 	return flag
 }
 
-/*
 func (s *Server) RunChats(ctx context.Context, rManager *repository.RepositoryManager) {
 	chats, err := rManager.GetChats(ctx)
 	if err != nil {
 		fmt.Println("Failed to run chats from DB")
 	}
 	for _, chat := range chats {
-		go s.RunChat(ctx)
+		go s.RunChat(ctx, dbModel.Chat(chat))
 	}
 }
-*/
 
 // creates a new chat only when chatname is available (checked before calling this function)
 func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *repository.RepositoryManager) error {
@@ -173,13 +217,12 @@ func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *reposi
 // lobby for all users, who just connetcted to chat
 func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repository.RepositoryManager) {
 	defer s.Wg.Done()
-
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
-
+	s.RunChats(ctx, rManager)
 	//creating lobby
 	lobby := NewChat("Lobby", 0)
 	lobby.Id = 0
@@ -265,7 +308,7 @@ func (s *Server) parse_command(ctx context.Context, command string, user *User, 
 	} else if strings.Contains(command, "/chats") {
 		for i := range s.Chats {
 			if i.Chat_name != "Lobby" {
-				user.Write(i.Chat_name)
+				user.Write(i.Chat_name + "\n" + "\r")
 			}
 		}
 	} else if strings.Contains(command, "/connect") {
