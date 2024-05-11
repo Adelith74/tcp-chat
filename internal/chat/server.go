@@ -229,7 +229,7 @@ func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repo
 	s.Lobby = lobby
 	s.Chats[lobby] = []*User{}
 
-	//listening for new connections
+	//listening for new connections.
 	s.Wg.Add(1)
 	defer s.Wg.Done()
 	go func() {
