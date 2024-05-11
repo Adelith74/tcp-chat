@@ -51,10 +51,26 @@ func (postRepository _chatRepository) GetId(ctx context.Context) (int, error) {
 		`SELECT MAX(c.chat_id) FROM public.chat as c`).Scan(&id)
 
 	if err != nil {
-		return 0, fmt.Errorf("ошибка получения чата: %s", err.Error())
+		return 0, fmt.Errorf("error of getting chat: %s", err.Error())
 	}
 
 	return id, nil
+}
+
+func (postRepository _chatRepository) GetChats(ctx context.Context) ([]model.Chat, error) {
+	var chats []model.Chat
+
+	rows, err := postRepository.db.PgConn.Query(ctx,
+		`SELECT c.chat_name, c.chat_id, c.creator, c.is_open FROM public.chat c `)
+	if err != nil {
+		return []model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
+	}
+	for rows.Next() {
+		chat := dbModel.Chat{}
+		rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen)
+		chats = append(chats, model.Chat(chat))
+	}
+	return make([]model.Chat, 0), nil
 }
 
 func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (model.Chat, error) {
@@ -65,7 +81,7 @@ func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (
 		chatId).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen)
 
 	if err != nil {
-		return model.Chat{}, fmt.Errorf("ошибка получения чата: %s", err.Error())
+		return model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
 	}
 
 	return model.Chat(chat), nil
@@ -79,7 +95,7 @@ func (postRepository _chatRepository) DeleteChat(ctx context.Context, chatId int
 		chatId).Scan(&chat.Chat_id)
 
 	if err != nil {
-		return fmt.Errorf("ошибка получения чата: %s", err.Error())
+		return fmt.Errorf("error of getting chat: %s", err.Error())
 	}
 
 	return nil

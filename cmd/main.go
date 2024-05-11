@@ -13,7 +13,6 @@ import (
 var server = chat.NewServer()
 
 func main() {
-
 	timeout := time.Second * 10
 
 	ctx := context.Background()

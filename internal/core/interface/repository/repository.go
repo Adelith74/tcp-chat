@@ -14,12 +14,13 @@ type ChatRepository interface {
 	CreateChat(ctx context.Context, chat model.Chat) (int, error)
 	GetChat(ctx context.Context, chatId int) (model.Chat, error)
 	DeleteChat(ctx context.Context, chatId int) error
+	GetChats(ctx context.Context) ([]model.Chat, error)
 }
 
 type MsgRepository interface {
 	CreateMsg(ctx context.Context, msg model.Message) (int, error)
 	GetMsgs(ctx context.Context) ([]model.Message, error)
-	GetMsgsByChatId(ctx context.Context, chatId int) ([]model.Message, error)
+	GetMsgsByChatId(ctx context.Context, chatId int, amount int) ([]model.Message, error)
 }
 
 //type EventRepository interface {

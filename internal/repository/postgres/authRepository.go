@@ -26,7 +26,7 @@ func (repo _authRepo) GetUser(ctx context.Context, login, hashPassword string) (
 	row := repo.PgConn.QueryRow(ctx, `SELECT * FROM public.user WHERE login=$1 AND pas=$2`, login, hashPassword)
 
 	if err := row.Scan(&user); err != nil {
-		return "", fmt.Errorf("не смогли получить юзера: %x", err)
+		return "", fmt.Errorf("couldn't get user: %x", err)
 	}
 
 	return login, nil
@@ -41,7 +41,7 @@ func (repo _authRepo) Register(ctx context.Context, login, hashPassword string) 
 	)
 
 	if err != nil {
-		return "", fmt.Errorf("не смогли создать: %x", err)
+		return "", fmt.Errorf("couldn't create: %x", err)
 	}
 
 	return login, nil

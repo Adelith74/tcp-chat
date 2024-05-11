@@ -17,6 +17,7 @@ func NewMsgRepo(db *db.Db) repository.MsgRepository {
 	return _msgRepository{db}
 }
 
+// adds a message to db
 func (msgRepository _msgRepository) CreateMsg(ctx context.Context, msg model.Message) (int, error) {
 	msgDb := dbModel.Message(msg)
 	var id int
@@ -31,6 +32,7 @@ func (msgRepository _msgRepository) CreateMsg(ctx context.Context, msg model.Mes
 	return id, err
 }
 
+// gets all messages from all chats
 func (msgRepository _msgRepository) GetMsgs(ctx context.Context) ([]model.Message, error) {
 
 	var messages []model.Message
@@ -43,7 +45,7 @@ func (msgRepository _msgRepository) GetMsgs(ctx context.Context) ([]model.Messag
 		err := rows.
 			Scan(&msg.Chat_id, &msg.Message, &msg.Username, &msg.Time)
 		if err != nil {
-			return []model.Message{}, fmt.Errorf("ошибка получения сообщений: %s", err.Error())
+			return []model.Message{}, fmt.Errorf("can't get messages: %s", err.Error())
 		}
 		messages = append(messages, model.Message(msg))
 	}
@@ -51,19 +53,20 @@ func (msgRepository _msgRepository) GetMsgs(ctx context.Context) ([]model.Messag
 	return messages, nil
 }
 
-func (msgRepository _msgRepository) GetMsgsByChatId(ctx context.Context, chatId int) ([]model.Message, error) {
+// gets chosen amount of messages from db with specified chat_id
+func (msgRepository _msgRepository) GetMsgsByChatId(ctx context.Context, chatId int, amount int) ([]model.Message, error) {
 	var messages []model.Message
 
 	var rows, _ = msgRepository.db.PgConn.Query(ctx,
-		`SELECT m.chat_id, m,message, m.username, m.time FROM public.message m WHERE m.chat_id=$1`,
-		chatId)
+		`SELECT m.chat_id, m,message, m.username, m.time FROM public.message m WHERE m.chat_id=$1 order by desc limit $2`,
+		chatId, amount)
 
 	for rows.Next() {
 		var msg = dbModel.Message{}
 		err := rows.
 			Scan(&msg.Chat_id, &msg.Message, &msg.Username, &msg.Time)
 		if err != nil {
-			return []model.Message{}, fmt.Errorf("ошибка получения сообщений: %s", err.Error())
+			return []model.Message{}, fmt.Errorf("can't get messages: %s", err.Error())
 		}
 		messages = append(messages, model.Message(msg))
 	}

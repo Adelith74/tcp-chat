@@ -31,7 +31,7 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 	})
 
 	router.POST("/shutdown", func(c *gin.Context) {
-
+		server.Wg.Done()
 	})
 
 	//broadcast messages to all users connected to the server
