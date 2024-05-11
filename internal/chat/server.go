@@ -101,6 +101,7 @@ func (s *Server) CheckChatName(chat_name string) bool {
 	return flag
 }
 
+/*
 func (s *Server) RunChats(ctx context.Context, rManager *repository.RepositoryManager) {
 	chats, err := rManager.GetChats(ctx)
 	if err != nil {
@@ -110,13 +111,15 @@ func (s *Server) RunChats(ctx context.Context, rManager *repository.RepositoryMa
 		go s.RunChat(ctx)
 	}
 }
+*/
 
 // creates a new chat only when chatname is available (checked before calling this function)
 func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *repository.RepositoryManager) error {
 	defer s.Wg.Done()
 	rw := sync.RWMutex{}
 	rw.Lock()
-	chat := NewChat(chat_name)
+	id, err := rManager.ChatRepository.GetId(ctx)
+	chat := NewChat(chat_name, id)
 	available_id, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen})
 
 	if err != nil {
@@ -178,7 +181,7 @@ func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repo
 	}
 
 	//creating lobby
-	lobby := NewChat("Lobby")
+	lobby := NewChat("Lobby", 0)
 	lobby.Id = 0
 	s.Lobby = lobby
 	s.Chats[lobby] = []*User{}

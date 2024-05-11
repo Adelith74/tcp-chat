@@ -15,6 +15,7 @@ type ChatRepository interface {
 	GetChat(ctx context.Context, chatId int) (model.Chat, error)
 	DeleteChat(ctx context.Context, chatId int) error
 	GetChats(ctx context.Context) ([]model.Chat, error)
+	GetId(ctx context.Context) (int, error)
 }
 
 type MsgRepository interface {

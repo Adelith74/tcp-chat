@@ -21,7 +21,7 @@ func (chatRepository _chatRepository) CreateChat(ctx context.Context, chat model
 	chatDb := dbModel.Chat(chat)
 	var id int
 
-	var str_format = fmt.Sprintf("INSERT INTO public.chat(chat_name, chat_id, creator, is_open) values (%s,%s,%s,%s) RETURNING chat_id",
+	var str_format = fmt.Sprintf("INSERT INTO public.chat(chat_name, chat_id, creator, is_open) values ('%s', %v, '%s', %v) RETURNING chat_id",
 		chatDb.Chat_name,
 		chatDb.Chat_id,
 		chatDb.Creator,
@@ -30,10 +30,7 @@ func (chatRepository _chatRepository) CreateChat(ctx context.Context, chat model
 	fmt.Println(str_format)
 
 	err := chatRepository.db.PgConn.QueryRow(ctx,
-		`INSERT INTO public.chat(chat_name, creator, is_open) values ($1,$2,$3) RETURNING chat_id`,
-		chatDb.Chat_name,
-		chatDb.Creator,
-		chatDb.IsOpen).Scan(&id)
+		str_format).Scan(&id)
 
 	chatRepository.db.PgConn.QueryRow(ctx, `COMMIT`)
 
@@ -45,22 +42,22 @@ func (chatRepository _chatRepository) CreateChat(ctx context.Context, chat model
 }
 
 // returns available Id
-func (postRepository _chatRepository) GetId(ctx context.Context) (int, error) {
+func (chatRepository _chatRepository) GetId(ctx context.Context) (int, error) {
 	id := 0
-	err := postRepository.db.PgConn.QueryRow(ctx,
-		`SELECT MAX(c.chat_id) FROM public.chat as c`).Scan(&id)
+	err := chatRepository.db.PgConn.QueryRow(ctx,
+		`SELECT MAX(COALESCE(c.chat_id,0)) FROM public.chat as c`).Scan(&id)
 
 	if err != nil {
 		return 0, fmt.Errorf("error of getting chat: %s", err.Error())
 	}
 
-	return id, nil
+	return id + 1, nil
 }
 
-func (postRepository _chatRepository) GetChats(ctx context.Context) ([]model.Chat, error) {
+func (chatRepository _chatRepository) GetChats(ctx context.Context) ([]model.Chat, error) {
 	var chats []model.Chat
 
-	rows, err := postRepository.db.PgConn.Query(ctx,
+	rows, err := chatRepository.db.PgConn.Query(ctx,
 		`SELECT c.chat_name, c.chat_id, c.creator, c.is_open FROM public.chat c `)
 	if err != nil {
 		return []model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
@@ -73,10 +70,10 @@ func (postRepository _chatRepository) GetChats(ctx context.Context) ([]model.Cha
 	return make([]model.Chat, 0), nil
 }
 
-func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (model.Chat, error) {
+func (chatRepository _chatRepository) GetChat(ctx context.Context, chatId int) (model.Chat, error) {
 	var chat dbModel.Chat
 
-	err := postRepository.db.PgConn.QueryRow(ctx,
+	err := chatRepository.db.PgConn.QueryRow(ctx,
 		`SELECT c.chat_name, c.chat_id, c.creator, c.is_open FROM public.chat c WHERE c.id=$1`,
 		chatId).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen)
 
@@ -87,10 +84,10 @@ func (postRepository _chatRepository) GetChat(ctx context.Context, chatId int) (
 	return model.Chat(chat), nil
 }
 
-func (postRepository _chatRepository) DeleteChat(ctx context.Context, chatId int) error {
+func (chatRepository _chatRepository) DeleteChat(ctx context.Context, chatId int) error {
 	var chat dbModel.Chat
 
-	err := postRepository.db.PgConn.QueryRow(ctx,
+	err := chatRepository.db.PgConn.QueryRow(ctx,
 		`DELETE FROM public.chat c WHERE c.id=$1`,
 		chatId).Scan(&chat.Chat_id)
 
