@@ -29,6 +29,8 @@ func (msgRepository _msgRepository) CreateMsg(ctx context.Context, msg model.Mes
 		msgDb.Username,
 		msgDb.Time).Scan(&id)
 
+	msgRepository.db.PgConn.Query(ctx, `COMMIT`)
+
 	return id, err
 }
 

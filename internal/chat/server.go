@@ -12,6 +12,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -57,7 +58,7 @@ func (s *Server) MoveUserToLobby(user *User) {
 
 }
 
-func (s *Server) RunChat(ctx context.Context, c dbModel.Chat) {
+func (s *Server) RunChat(ctx context.Context, c dbModel.Chat, rManager *repository.RepositoryManager) {
 	s.Wg.Add(1)
 	defer s.Wg.Done()
 	rw := sync.RWMutex{}
@@ -87,6 +88,10 @@ func (s *Server) RunChat(ctx context.Context, c dbModel.Chat) {
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
+						_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
+						if err != nil {
+							log.Println("Error during logging message")
+						}
 						chat.Messages <- fmt.Sprintf("%s: %s \n\r", user.Username, m)
 					}
 				}
@@ -153,7 +158,7 @@ func (s *Server) RunChats(ctx context.Context, rManager *repository.RepositoryMa
 		fmt.Println("Failed to run chats from DB")
 	}
 	for _, chat := range chats {
-		go s.RunChat(ctx, dbModel.Chat(chat))
+		go s.RunChat(ctx, dbModel.Chat(chat), rManager)
 	}
 }
 
@@ -193,6 +198,10 @@ func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *reposi
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
+						_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
+						if err != nil {
+							log.Println("Error during logging message")
+						}
 						chat.Messages <- fmt.Sprintf("%s: %s \n\r", user.Username, m)
 					}
 				}
