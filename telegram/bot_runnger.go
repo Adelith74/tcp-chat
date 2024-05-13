@@ -3,10 +3,20 @@ package telegram
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"os"
 )
 
+func getKey(path string) string {
+	file, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(file)
+}
+
 func Run() {
-	bot, err := tgbotapi.NewBotAPI("")
+	key := getKey("./telegram/api_key.txt")
+	bot, err := tgbotapi.NewBotAPI(key)
 	if err != nil {
 		log.Panic(err)
 	}

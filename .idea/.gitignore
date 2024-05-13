@@ -1,0 +1,7 @@
+# Default ignored files
+../telegram/api_key.txt
+/shelf/
+/workspace.xml
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
