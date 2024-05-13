@@ -25,7 +25,7 @@ func New(ctx context.Context) *Db {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Создалось")
+	log.Println("Connected to DB")
 
 	return &Db{PgConn: conn}
 }

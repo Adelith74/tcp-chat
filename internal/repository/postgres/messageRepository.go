@@ -7,6 +7,7 @@ import (
 	"go_chat/internal/lib/db"
 	"go_chat/internal/model"
 	"go_chat/internal/repository/dbModel"
+	"log"
 )
 
 type _msgRepository struct {
@@ -29,7 +30,11 @@ func (msgRepository _msgRepository) CreateMsg(ctx context.Context, msg model.Mes
 		msgDb.Username,
 		msgDb.Time).Scan(&id)
 
-	msgRepository.db.PgConn.Query(ctx, `COMMIT`)
+	if err != nil {
+		log.Fatal("Error during logging messages into DB")
+	} else {
+		msgRepository.db.PgConn.Query(ctx, `COMMIT`)
+	}
 
 	return id, err
 }

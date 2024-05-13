@@ -7,12 +7,17 @@ import (
 	"go_chat/internal/chat"
 	"go_chat/internal/lib/db"
 	"go_chat/internal/repository"
+	"go_chat/telegram"
 	"time"
 )
 
 var server = chat.NewServer()
 
 func main() {
+	telegram.Run()
+}
+
+func proceed() {
 	timeout := time.Second * 10
 
 	ctx := context.Background()
