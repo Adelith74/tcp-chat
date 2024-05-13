@@ -2,6 +2,7 @@
 /telegram/api_key.txt
 api_key.txt
 ../telegram/api_key.txt
+*.txt
 /shelf/
 /api_key.txt
 /workspace.xml
