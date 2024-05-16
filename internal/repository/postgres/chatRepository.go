@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"go_chat/internal/core/interface/repository"
 	"go_chat/internal/lib/db"
@@ -39,6 +41,29 @@ func (chatRepository _chatRepository) CreateChat(ctx context.Context, chat model
 	}
 
 	return id, err
+}
+
+func (chatRepository _chatRepository) LinkChat(ctx context.Context, tgID int, internalID int) error {
+	var str_format = fmt.Sprintf("SELECT tgchatid from chat WHERE chat_id = %v", internalID)
+	var id sql.NullInt64
+	err := chatRepository.db.PgConn.QueryRow(context.Background(), str_format).Scan(&id)
+	if err != nil {
+		return errors.New("unable to find chat with such id")
+	} else {
+		if id.Valid {
+			return errors.New("this chat already has linked chat")
+		} else {
+			str_format = fmt.Sprintf("UPDATE chat set tgchatid = %v where chat_id = %v", tgID, internalID)
+			_, er := chatRepository.db.PgConn.Query(context.Background(), str_format)
+			if er != nil {
+				return errors.New("error during update")
+			} else {
+				chatRepository.db.PgConn.Query(context.Background(), "COMMIT")
+				return nil
+			}
+
+		}
+	}
 }
 
 // returns available Id
