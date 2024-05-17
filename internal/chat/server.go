@@ -231,13 +231,14 @@ func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repo
 		log.Println(err.Error())
 		return
 	}
-	s.RunChats(ctx, rManager)
+
 	//creating lobby
 	lobby := NewChat("Lobby", 0)
 	lobby.Id = 0
 	s.Lobby = lobby
 	s.Chats[lobby] = []*User{}
 
+	s.RunChats(ctx, rManager)
 	//listening for new connections.
 	s.Wg.Add(1)
 	defer s.Wg.Done()
