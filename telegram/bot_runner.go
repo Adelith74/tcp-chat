@@ -17,12 +17,42 @@ type BotRunner struct {
 	CTX context.Context
 }
 
+func (br *BotRunner) SendMessage(text string, update tgbotapi.Update) {
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+	msg.ReplyToMessageID = update.Message.MessageID
+	br.bot.Send(msg)
+}
+
 func getKey(path string) string {
 	file, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return string(file)
+}
+
+func (br *BotRunner) ProcessCommand(update tgbotapi.Update) {
+	if update.FromChat().IsGroup() {
+		symbols := strings.Split(update.Message.Text, " ")
+		if len(symbols) > 2 {
+			br.SendMessage("Wrong syntax", update)
+		} else if len(symbols) > 1 {
+			internal := symbols[1]
+			id, err := strconv.Atoi(internal)
+			if err != nil {
+				br.SendMessage("Wrong syntax", update)
+			} else {
+				err = br.RM.ChatRepository.LinkChat(br.CTX, int(update.FromChat().ID), id)
+				if err != nil {
+					br.SendMessage("Error occurred", update)
+				} else {
+					br.SendMessage("Successful", update)
+				}
+			}
+		}
+	} else {
+		br.SendMessage("You can't use this command here", update)
+	}
 }
 
 func (br *BotRunner) Run() {
@@ -47,45 +77,12 @@ func (br *BotRunner) Run() {
 	for update := range updates {
 		if update.Message != nil {
 			if strings.Contains(update.Message.Text, "/link") {
-				if update.FromChat().IsGroup() {
-					symbols := strings.Split(update.Message.Text, " ")
-					if len(symbols) > 2 {
-						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Wrong syntax")
-						msg.ReplyToMessageID = update.Message.MessageID
-						bot.Send(msg)
-					} else if len(symbols) > 1 {
-						internal := symbols[1]
-						id, err := strconv.Atoi(internal)
-						if err != nil {
-							msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Wrong syntax")
-							msg.ReplyToMessageID = update.Message.MessageID
-							bot.Send(msg)
-						} else {
-							err = br.RM.ChatRepository.LinkChat(br.CTX, int(update.FromChat().ID), id)
-							if err != nil {
-								msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Error occurred")
-								msg.ReplyToMessageID = update.Message.MessageID
-								bot.Send(msg)
-							} else {
-								msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Successful")
-								msg.ReplyToMessageID = update.Message.MessageID
-								bot.Send(msg)
-							}
-						}
-					}
-				} else {
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "You can't use this command here")
-					msg.ReplyToMessageID = update.Message.MessageID
-					bot.Send(msg)
-				}
+				br.ProcessCommand(update)
 			} else {
-				// If we got a message
+				// If we got a message and it's not a command
 				log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-				msg.ReplyToMessageID = update.Message.MessageID
-
-				bot.Send(msg)
+				br.SendMessage(update.Message.Text, update)
 			}
 		}
 	}

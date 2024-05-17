@@ -4,6 +4,8 @@ import (
 	"context"
 	"go_chat/internal/chat"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 
 	"go_chat/internal/repository"
@@ -32,6 +34,33 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 
 	router.POST("/shutdown", func(c *gin.Context) {
 		server.Wg.Done()
+	})
+
+	//send message to all users connected to chat
+	router.POST("/send_message", func(c *gin.Context) {
+		msg := c.Query("message")
+		author := c.Query("author")
+		chat_id, err := strconv.Atoi(c.Query("chat_id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Unable to parse chat_id"})
+			return
+		}
+		trimmed := strings.TrimSpace(author)
+		if trimmed == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "No author"})
+			return
+		}
+		for ch, users := range server.Chats {
+			if ch.Chat_id == chat_id {
+				for _, user := range users {
+					user.Write(author + ": " + msg + "\n" + "\r")
+				}
+				break
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not found"})
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
 	})
 
 	//broadcast messages to all users connected to the server
