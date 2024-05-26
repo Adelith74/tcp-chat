@@ -1,6 +1,9 @@
 package chat
 
-import "net"
+import (
+	"log"
+	"net"
+)
 
 type User struct {
 	Username   string
@@ -9,5 +12,8 @@ type User struct {
 
 // writes message to user's connection
 func (u *User) Write(message string) {
-	u.Connection.Write([]byte(message))
+	_, err := u.Connection.Write([]byte(message))
+	if err != nil {
+		log.Fatal(err)
+	}
 }

@@ -32,8 +32,6 @@ func (msgRepository _msgRepository) CreateMsg(ctx context.Context, msg model.Mes
 
 	if err != nil {
 		log.Fatal("Error during logging messages into DB")
-	} else {
-		msgRepository.db.PgConn.Query(ctx, `COMMIT`)
 	}
 
 	return id, err

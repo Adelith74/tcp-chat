@@ -8,6 +8,7 @@ import (
 type AuthRepository interface {
 	GetUser(ctx context.Context, login, hashPassword string) (string, error)
 	Register(ctx context.Context, login, hashPassword string) (string, error)
+	EncodePassword(ctx context.Context, password string) (string, error)
 }
 
 type ChatRepository interface {

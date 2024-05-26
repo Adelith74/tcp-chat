@@ -88,10 +88,12 @@ func (s *Server) RunChat(ctx context.Context, c dbModel.Chat, rManager *reposito
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
-						_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
-						if err != nil {
-							log.Println("Error during logging message")
-						}
+						go func() {
+							_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
+							if err != nil {
+								log.Println("Error during logging message")
+							}
+						}()
 						chat.Messages <- fmt.Sprintf("%s: %s \n\r", user.Username, m)
 					}
 				}
@@ -156,6 +158,7 @@ func (s *Server) RunChats(ctx context.Context, rManager *repository.RepositoryMa
 	chats, err := rManager.GetChats(ctx)
 	if err != nil {
 		fmt.Println("Failed to run chats from DB")
+		return
 	}
 	for _, chat := range chats {
 		go s.RunChat(ctx, dbModel.Chat(chat), rManager)
@@ -169,7 +172,7 @@ func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *reposi
 	rw.Lock()
 	id, err := rManager.ChatRepository.GetId(ctx)
 	chat := NewChat(chat_name, id)
-	available_id, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen})
+	available_id, err := rManager.ChatRepository.CreateChat(ctx, model.Chat{Chat_name: chat.Chat_name, Chat_id: chat.Chat_id, Creator: chat.Creator.Username, IsOpen: chat.IsOpen, Creator_id: 0})
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -198,10 +201,12 @@ func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *reposi
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
-						_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
-						if err != nil {
-							log.Println("Error during logging message")
-						}
+						go func() {
+							_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
+							if err != nil {
+								log.Println("Error during logging message")
+							}
+						}()
 						chat.Messages <- fmt.Sprintf("%s: %s \n\r", user.Username, m)
 					}
 				}
@@ -210,7 +215,7 @@ func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *reposi
 			}()
 		case msg := <-chat.Messages:
 			for u := range chat.Alive {
-				u.Write(msg)
+				go u.Write(msg)
 			}
 		case dconn := <-chat.Dead_connections:
 			log.Printf("%v has disconnected\n", chat.Alive[dconn])
@@ -255,6 +260,8 @@ func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repo
 		select {
 		case user := <-lobby.Connections:
 			//listening for user's messages
+			s.Wg.Add(1)
+			defer s.Wg.Done()
 			go func() {
 				rd := bufio.NewReader(user.Connection)
 				if user.Username == "" {
