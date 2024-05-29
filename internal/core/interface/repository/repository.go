@@ -18,6 +18,7 @@ type ChatRepository interface {
 	GetChats(ctx context.Context) ([]model.Chat, error)
 	GetId(ctx context.Context) (int, error)
 	LinkChat(ctx context.Context, tgID int, internalID int) error
+	GetIdWithTgID(ctx context.Context, tgID int64) (model.Chat, error)
 }
 
 type MsgRepository interface {

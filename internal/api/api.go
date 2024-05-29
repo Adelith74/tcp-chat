@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"go_chat/internal/chat"
 	"net/http"
 	"strconv"
@@ -12,6 +13,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+type body struct {
+	Tg_chat_id int64  `json:"tg_chat_id"`
+	Message    string `json:"message"`
+	Author     string `json:"author"`
+}
 
 func Start_api(ctx context.Context, server *chat.Server, rManager *repository.RepositoryManager) {
 	defer server.Wg.Done()
@@ -34,6 +41,37 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 
 	router.POST("/shutdown", func(c *gin.Context) {
 		server.Wg.Done()
+	})
+
+	router.POST("/send_message_tg", func(c *gin.Context) {
+		var b body
+		err := c.BindJSON(&b)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Bad request"})
+			return
+		}
+		if "" == strings.TrimSpace(b.Author) {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "No author"})
+			return
+		}
+		chat, err := rManager.ChatRepository.GetIdWithTgID(ctx, b.Tg_chat_id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": err})
+			return
+		}
+		for ch, users := range server.Chats {
+			if ch.Chat_id == chat.Chat_id {
+				msg := b.Message
+				for _, user := range users {
+					user.Write(fmt.Sprintf("[" + b.Author + " from Telegram]" + ": " + msg + "\n" + "\r"))
+				}
+				break
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not found"})
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
+
 	})
 
 	//send message to all users connected to chat

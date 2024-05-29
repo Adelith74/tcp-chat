@@ -23,8 +23,8 @@ type Server struct {
 	Available int
 }
 
-// if this name is available returns true
-func (s *Server) Check_username(username string) bool {
+// CheckUsername returns true if this name is available
+func (s *Server) CheckUsername(username string) bool {
 	flag := true
 	for _, u := range s.Users {
 		if u.Username == username {
@@ -52,10 +52,6 @@ func (s *Server) KickUser(username string) (err error) {
 	}
 	rw.Unlock()
 	return errors.New("user not found")
-}
-
-func (s *Server) MoveUserToLobby(user *User) {
-
 }
 
 func (s *Server) RunChat(ctx context.Context, c dbModel.Chat, rManager *repository.RepositoryManager) {
@@ -143,7 +139,7 @@ func NewServer() Server {
 	}
 }
 
-// returns true if chatname is available
+// CheckChatName returns true if chat name is available
 func (s *Server) CheckChatName(chat_name string) bool {
 	flag := true
 	for v := range s.Chats {
@@ -165,7 +161,7 @@ func (s *Server) RunChats(ctx context.Context, rManager *repository.RepositoryMa
 	}
 }
 
-// creates a new chat only when chatname is available (checked before calling this function)
+// NewChat creates a new chat only when chat name is available (checked before calling this function)
 func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *repository.RepositoryManager) error {
 	defer s.Wg.Done()
 	rw := sync.RWMutex{}
@@ -273,7 +269,7 @@ func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repo
 							fmt.Println(err)
 						}
 						username = strings.TrimSpace(username)
-						if !s.Check_username(username) {
+						if !s.CheckUsername(username) {
 							user.Write("This username is already taken\n\r")
 						} else {
 							break

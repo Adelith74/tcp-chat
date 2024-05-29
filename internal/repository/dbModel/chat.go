@@ -6,4 +6,5 @@ type Chat struct {
 	Creator    string `db:"creator"`
 	IsOpen     bool   `db:"is_open"`
 	Creator_id int    `db:"creator_id"`
+	TgID       string `db:"tgchatid"`
 }

@@ -27,7 +27,7 @@ func main() {
 	manager := repository.NewRepositoryManager(database)
 	go func() {
 		defer wg.Done()
-		br := telegram.BotRunner{RM: &manager, CTX: withTimeout}
+		br := telegram.BotRunner{RM: &manager, CTX: withTimeout, ApiURL: "http://localhost:8080"}
 		br.Run()
 	}()
 	go func() {

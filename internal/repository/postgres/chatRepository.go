@@ -9,6 +9,7 @@ import (
 	"go_chat/internal/lib/db"
 	"go_chat/internal/model"
 	"go_chat/internal/repository/dbModel"
+	"strconv"
 )
 
 type _chatRepository struct {
@@ -67,7 +68,7 @@ func (chatRepository *_chatRepository) LinkChat(ctx context.Context, tgID int, i
 	}
 }
 
-// returns available Id
+// GetId returns available Id
 func (chatRepository *_chatRepository) GetId(ctx context.Context) (int, error) {
 	id := 0
 	row := chatRepository.db.PgConn.QueryRow(ctx,
@@ -81,18 +82,32 @@ func (chatRepository *_chatRepository) GetId(ctx context.Context) (int, error) {
 	return id + 1, nil
 }
 
+func (chatRepository *_chatRepository) GetIdWithTgID(ctx context.Context, tgID int64) (model.Chat, error) {
+	var chat dbModel.Chat
+
+	err := chatRepository.db.PgConn.QueryRow(ctx,
+		`SELECT c.chat_name, c.chat_id, c.creator_id, c.is_open, c.tgchatid FROM public.chat c WHERE c.tgchatid=$1`,
+		strconv.FormatInt(tgID, 10)).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator_id, &chat.IsOpen, &chat.TgID)
+
+	if err != nil {
+		return model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
+	}
+
+	return model.Chat(chat), nil
+}
+
 func (chatRepository *_chatRepository) GetChats(ctx context.Context) ([]model.Chat, error) {
 	var chats []model.Chat
 
 	rows, err := chatRepository.db.PgConn.Query(ctx,
-		`SELECT c.chat_name, c.chat_id, c.creator, c.is_open, c.creator_id FROM public.chat c `)
+		`SELECT c.chat_name, c.chat_id, c.creator, c.is_open, c.creator_id, c.tgchatid FROM public.chat c `)
 	if err != nil {
 		return []model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
 	}
 	defer rows.Close()
 	chat := dbModel.Chat{}
 	for rows.Next() {
-		err := rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen, &chat.Creator_id)
+		err := rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen, &chat.Creator_id, &chat.TgID)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -105,8 +120,8 @@ func (chatRepository *_chatRepository) GetChat(ctx context.Context, chatId int) 
 	var chat dbModel.Chat
 
 	err := chatRepository.db.PgConn.QueryRow(ctx,
-		`SELECT c.chat_name, c.chat_id, c.creator, c.is_open FROM public.chat c WHERE c.id=$1`,
-		chatId).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen)
+		`SELECT c.chat_name, c.chat_id, c.creator_id, c.is_open, c.tgchatid FROM public.chat c WHERE c.id=$1`,
+		chatId).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator_id, &chat.IsOpen, &chat.TgID)
 
 	if err != nil {
 		return model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())

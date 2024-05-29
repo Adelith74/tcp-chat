@@ -2,25 +2,52 @@ package telegram
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"go_chat/internal/repository"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 )
 
 type BotRunner struct {
-	key string
-	bot *tgbotapi.BotAPI
-	RM  *repository.RepositoryManager
-	CTX context.Context
+	key    string
+	bot    *tgbotapi.BotAPI
+	RM     *repository.RepositoryManager
+	CTX    context.Context
+	ApiURL string
 }
 
 func (br *BotRunner) SendMessage(text string, update tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 	msg.ReplyToMessageID = update.Message.MessageID
 	br.bot.Send(msg)
+}
+
+// SendMessageWithID Requires TgChatID to send message to linked internal chat
+func (br *BotRunner) SendMessageWithID(text string, chatID int64, username string) {
+
+	url := fmt.Sprintf("%s/send_message_tg", br.ApiURL)
+
+	json, _ := json.Marshal(map[string]any{"message": text, "tg_chat_id": chatID, "author": username})
+
+	reader := strings.NewReader(string(json))
+	req, err := http.NewRequest("POST", url, reader)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer resp.Body.Close()
+
+	fmt.Println("response Status:", resp.Status)
+	fmt.Println("response Headers:", resp.Header)
+	fmt.Println("response Body:", resp.Body)
+
 }
 
 func getKey(path string) string {
@@ -82,7 +109,8 @@ func (br *BotRunner) Run() {
 				// If we got a message and it's not a command
 				log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
-				br.SendMessage(update.Message.Text, update)
+				go br.SendMessageWithID(update.Message.Text, update.FromChat().ID, update.Message.From.UserName)
+
 			}
 		}
 	}

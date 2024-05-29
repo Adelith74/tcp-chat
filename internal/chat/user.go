@@ -6,7 +6,9 @@ import (
 )
 
 type User struct {
+	UserId     int
 	Username   string
+	TgID       int
 	Connection net.Conn
 }
 
@@ -14,6 +16,6 @@ type User struct {
 func (u *User) Write(message string) {
 	_, err := u.Connection.Write([]byte(message))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }

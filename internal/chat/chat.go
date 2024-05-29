@@ -10,10 +10,8 @@ type Chat struct {
 	Alive            map[*User]string
 	IsOpen           bool
 	Id               int
-}
-
-func (chat *Chat) LogMessage(message string, user User) {
-	//db.log(User.username, Date.Now(), message, chat.Chat_id)
+	//TgID is a telegram linked chat ID, which can be nil, that's why TgID is a string, I know, that sucks
+	TgID string
 }
 
 func NewChat(name string, id int) *Chat {

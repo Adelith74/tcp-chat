@@ -6,4 +6,5 @@ type Chat struct {
 	Creator    string
 	IsOpen     bool
 	Creator_id int
+	TgID       string
 }
