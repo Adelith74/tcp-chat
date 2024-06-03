@@ -32,7 +32,11 @@ func (br *BotRunner) SendMessageWithID(text string, chatID int64, username strin
 
 	url := fmt.Sprintf("%s/send_message_tg", br.ApiURL)
 
-	json, _ := json.Marshal(map[string]any{"message": text, "tg_chat_id": chatID, "author": username})
+	json, err := json.Marshal(map[string]any{"message": text, "tg_chat_id": chatID, "author": username})
+	if err != nil {
+		log.Println("SendMessageWithID" + err.Error())
+		return
+	}
 
 	reader := strings.NewReader(string(json))
 	req, err := http.NewRequest("POST", url, reader)

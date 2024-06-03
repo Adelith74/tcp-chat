@@ -84,13 +84,20 @@ func (chatRepository *_chatRepository) GetId(ctx context.Context) (int, error) {
 
 func (chatRepository *_chatRepository) GetIdWithTgID(ctx context.Context, tgID int64) (model.Chat, error) {
 	var chat dbModel.Chat
+	var tg_id sql.NullString
 
 	err := chatRepository.db.PgConn.QueryRow(ctx,
 		`SELECT c.chat_name, c.chat_id, c.creator_id, c.is_open, c.tgchatid FROM public.chat c WHERE c.tgchatid=$1`,
-		strconv.FormatInt(tgID, 10)).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator_id, &chat.IsOpen, &chat.TgID)
+		strconv.FormatInt(tgID, 10)).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator_id, &chat.IsOpen, &tg_id)
 
 	if err != nil {
 		return model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
+	}
+
+	if tg_id.Valid {
+		chat.TgID = tg_id.String
+	} else {
+		chat.TgID = ""
 	}
 
 	return model.Chat(chat), nil
@@ -107,9 +114,15 @@ func (chatRepository *_chatRepository) GetChats(ctx context.Context) ([]model.Ch
 	defer rows.Close()
 	chat := dbModel.Chat{}
 	for rows.Next() {
-		err := rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen, &chat.Creator_id, &chat.TgID)
+		var tgID sql.NullString
+		err := rows.Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator, &chat.IsOpen, &chat.Creator_id, &tgID)
 		if err != nil {
 			fmt.Println(err)
+		}
+		if tgID.Valid {
+			chat.TgID = tgID.String
+		} else {
+			chat.TgID = ""
 		}
 		chats = append(chats, model.Chat(chat))
 	}
@@ -118,16 +131,24 @@ func (chatRepository *_chatRepository) GetChats(ctx context.Context) ([]model.Ch
 
 func (chatRepository *_chatRepository) GetChat(ctx context.Context, chatId int) (model.Chat, error) {
 	var chat dbModel.Chat
+	var tgID sql.NullString
 
 	err := chatRepository.db.PgConn.QueryRow(ctx,
 		`SELECT c.chat_name, c.chat_id, c.creator_id, c.is_open, c.tgchatid FROM public.chat c WHERE c.id=$1`,
-		chatId).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator_id, &chat.IsOpen, &chat.TgID)
+		chatId).Scan(&chat.Chat_name, &chat.Chat_id, &chat.Creator_id, &chat.IsOpen, &tgID)
 
 	if err != nil {
 		return model.Chat{}, fmt.Errorf("error of getting chat: %s", err.Error())
 	}
 
-	return model.Chat(chat), nil
+	if tgID.Valid {
+		chat.TgID = tgID.String
+		return model.Chat(chat), nil
+	} else {
+		chat.TgID = ""
+		return model.Chat(chat), nil
+	}
+
 }
 
 func (chatRepository *_chatRepository) DeleteChat(ctx context.Context, chatId int) error {
