@@ -20,6 +20,11 @@ type body struct {
 	Author     string `json:"author"`
 }
 
+type user struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 func Start_api(ctx context.Context, server *chat.Server, rManager *repository.RepositoryManager) {
 	defer server.Wg.Done()
 	router := gin.Default()
@@ -37,6 +42,35 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 
 	router.POST("/auth", func(c *gin.Context) {
 
+	})
+
+	router.POST("/register", func(c *gin.Context) {
+		var user user
+		err := c.BindJSON(&user)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Bad request"})
+			return
+		}
+		if strings.TrimSpace(user.Username) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "No username"})
+			return
+		}
+		if strings.TrimSpace(user.Password) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "No password"})
+			return
+		}
+		hash, err := rManager.AuthRepository.EncodePassword(ctx, user.Password)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "Error during encoding password: " + err.Error()})
+			return
+		}
+		_, err = rManager.AuthRepository.Register(ctx, user.Username, hash)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "Error during registration: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"message": "Successful"})
+		return
 	})
 
 	router.POST("/shutdown", func(c *gin.Context) {
@@ -65,13 +99,12 @@ func Start_api(ctx context.Context, server *chat.Server, rManager *repository.Re
 				for _, user := range users {
 					user.Write(fmt.Sprintf("[" + b.Author + " from Telegram]" + ": " + msg + "\n" + "\r"))
 				}
+				c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
 				break
 			}
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not found"})
-			return
 		}
-		c.JSON(http.StatusAccepted, gin.H{"message": "Delivered"})
-
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not found"})
+		return
 	})
 
 	//send message to all users connected to chat

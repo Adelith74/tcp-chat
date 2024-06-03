@@ -27,6 +27,14 @@ func (br *BotRunner) SendMessage(text string, update tgbotapi.Update) {
 	br.bot.Send(msg)
 }
 
+func (br *BotRunner) SendMessageWithTgID(text string, id int64) {
+	msg := tgbotapi.NewMessage(id, text)
+	_, err := br.bot.Send(msg)
+	if err != nil {
+		return
+	}
+}
+
 // SendMessageWithID Requires TgChatID to send message to linked internal chat
 func (br *BotRunner) SendMessageWithID(text string, chatID int64, username string) {
 

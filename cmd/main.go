@@ -28,7 +28,9 @@ func main() {
 	go func() {
 		defer wg.Done()
 		br := telegram.BotRunner{RM: &manager, CTX: withTimeout, ApiURL: "http://localhost:8080"}
-		br.Run()
+		go br.Run()
+		server.BotRunner = &br
+		server.RManager = &manager
 	}()
 	go func() {
 		defer wg.Done()

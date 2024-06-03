@@ -8,8 +8,10 @@ import (
 	"go_chat/internal/model"
 	"go_chat/internal/repository"
 	"go_chat/internal/repository/dbModel"
+	"go_chat/telegram"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,17 +23,18 @@ type Server struct {
 	Users     []*User
 	Wg        sync.WaitGroup
 	Available int
+	BotRunner *telegram.BotRunner
+	RManager  *repository.RepositoryManager
 }
 
-// CheckUsername returns true if this name is available
-func (s *Server) CheckUsername(username string) bool {
-	flag := true
-	for _, u := range s.Users {
-		if u.Username == username {
-			flag = false
-		}
+// CheckUsername returns true if credentials are ok
+func (s *Server) CheckUsername(username, password string) bool {
+	_, err := s.RManager.AuthRepository.GetUser(context.Background(), username, password)
+	if err != nil {
+		return false
+	} else {
+		return true
 	}
-	return flag
 }
 
 func (s *Server) KickUser(username string) (err error) {
@@ -54,6 +57,17 @@ func (s *Server) KickUser(username string) (err error) {
 	return errors.New("user not found")
 }
 
+func (s *Server) SendToTelegram(ctx context.Context, tgID string, text string) {
+	if tgID == "" {
+		return
+	}
+	parseInt, err := strconv.ParseInt(tgID, 10, 64)
+	if err != nil {
+		return
+	}
+	s.BotRunner.SendMessageWithTgID(text, parseInt)
+}
+
 func (s *Server) RunChat(ctx context.Context, c dbModel.Chat, rManager *repository.RepositoryManager) {
 	s.Wg.Add(1)
 	defer s.Wg.Done()
@@ -64,6 +78,7 @@ func (s *Server) RunChat(ctx context.Context, c dbModel.Chat, rManager *reposito
 	chat.Alive = make(map[*User]string)
 	chat.Dead_connections = make(chan *User)
 	chat.Messages = make(chan string)
+	chat.TgID = c.TgID
 	s.Chats[chat] = []*User{}
 	fmt.Printf("%s was launched during app start \n", chat.Chat_name)
 	rw.Unlock()
@@ -84,6 +99,9 @@ func (s *Server) RunChat(ctx context.Context, c dbModel.Chat, rManager *reposito
 					if strings.Contains(m, "/leave") {
 						break
 					} else {
+						go func() {
+							s.SendToTelegram(ctx, chat.TgID, fmt.Sprintf("[%s from internal]: %s \n\r", user.Username, m))
+						}()
 						go func() {
 							_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
 							if err != nil {
@@ -198,6 +216,9 @@ func (s *Server) NewChat(ctx context.Context, chat_name string, rManager *reposi
 						break
 					} else {
 						go func() {
+							s.SendToTelegram(ctx, chat.TgID, m)
+						}()
+						go func() {
 							_, err := rManager.MsgRepository.CreateMsg(ctx, model.Message{Username: user.Username, Chat_id: chat.Chat_id, Message: m, Time: time.Now()})
 							if err != nil {
 								log.Println("Error during logging message")
@@ -268,9 +289,15 @@ func (s *Server) Start_Lobby(ctx context.Context, address string, rManager *repo
 						if err != nil {
 							fmt.Println(err)
 						}
+						user.Write("Enter your password: \n\r")
+						pass, err := rd.ReadString('\n')
+						if err != nil {
+							fmt.Println(err)
+						}
 						username = strings.TrimSpace(username)
-						if !s.CheckUsername(username) {
-							user.Write("This username is already taken\n\r")
+						pass = strings.TrimSpace(pass)
+						if !s.CheckUsername(username, pass) {
+							user.Write("Wrong data\n\r")
 						} else {
 							break
 						}
